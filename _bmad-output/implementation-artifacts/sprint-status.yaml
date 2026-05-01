@@ -61,10 +61,10 @@ development_status:
   # EPIC 1: Project Foundation & Environment Setup
   # PRIORITY: Start here. 1.1 must land before anything else.
   # ─────────────────────────────────────────────────────────────
-  epic-1: backlog
+  epic-1: in-progress
 
   # Step 1 — do this first (one dev, unblocks everything)
-  1-1-docker-compose-stack-and-environment-configuration: backlog
+  1-1-docker-compose-stack-and-environment-configuration: review
 
   # Step 2 — parallelisable once 1.1 is done
   # Dev A track: DB schema + ML scaffold

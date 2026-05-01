@@ -1,0 +1,29 @@
+# Local development overrides — hot-reload for all application services.
+# This file is automatically merged with docker-compose.yml by Docker Compose.
+# NOT used in CI or production — base docker-compose.yml only in those environments.
+services:
+
+  frontend:
+    build:
+      context: ./frontend
+      target: build
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: ["npm", "run", "start", "--", "--host", "0.0.0.0", "--poll", "500"]
+    ports:
+      - "4200:4200"
+
+  api:
+    build:
+      context: ./api
+      target: build
+    volumes:
+      - ./api:/app
+      - /app/node_modules
+    command: ["npm", "run", "start:dev"]
+
+  ml-sidecar:
+    volumes:
+      - ./ml-sidecar:/app
+    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
