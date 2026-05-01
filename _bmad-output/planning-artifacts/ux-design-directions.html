@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BullByte — UX Design Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+<style>
+  /* ─── Design Tokens ─────────────────────────────────────── */
+  :root {
+    --color-surface-base: #F4F4F0;
+    --color-surface-raised: #FFFFFF;
+    --color-surface-overlay: #FAFAF8;
+    --color-border: #E5E5E1;
+    --color-text-primary: #1A1A1A;
+    --color-text-secondary: #6B6B6B;
+    --color-text-tertiary: #9B9B9B;
+    --color-text-link: #1E3A5F;
+    --color-accent-primary: #1E3A5F;
+    --color-accent-primary-light: #E8EEF4;
+
+    --color-verdict-delivered-bg: #D1FAE5;
+    --color-verdict-delivered-text: #065F46;
+    --color-verdict-missed-bg: #FEE2E2;
+    --color-verdict-missed-text: #991B1B;
+    --color-verdict-pending-bg: #FEF3C7;
+    --color-verdict-pending-text: #92400E;
+    --color-verdict-insufficient-bg: #F3F4F6;
+    --color-verdict-insufficient-text: #374151;
+    --color-verdict-revised-bg: #EDE9FE;
+    --color-verdict-revised-text: #5B21B6;
+
+    --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+    --space-6: 24px; --space-8: 32px; --space-12: 48px; --space-16: 64px;
+
+    --type-display: 700 32px/1.2 'Inter', sans-serif;
+    --type-h1: 600 24px/1.3 'Inter', sans-serif;
+    --type-h2: 600 18px/1.35 'Inter', sans-serif;
+    --type-h3: 600 16px/1.4 'Inter', sans-serif;
+    --type-body: 400 14px/1.5 'Inter', sans-serif;
+    --type-body-sm: 400 13px/1.5 'Inter', sans-serif;
+    --type-caption: 400 12px/1.4 'Inter', sans-serif;
+    --type-mono: 400 13px/1.6 'JetBrains Mono', monospace;
+
+    --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px;
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-panel: 0 4px 16px rgba(0,0,0,0.10);
+    --transition: 160ms ease;
+  }
+
+  /* ─── Reset ─────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font: var(--type-body); color: var(--color-text-primary); background: var(--color-surface-base); }
+  a { color: var(--color-text-link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ─── Shell ─────────────────────────────────────────────── */
+  .screen-nav {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--color-accent-primary); color: #fff;
+    display: flex; gap: var(--space-2); padding: var(--space-3) var(--space-6);
+    flex-wrap: wrap; align-items: center;
+  }
+  .screen-nav h1 { font: 600 15px/1 'Inter',sans-serif; margin-right: var(--space-4); letter-spacing: -0.01em; }
+  .screen-nav button {
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+    color: #fff; padding: 5px 14px; border-radius: 20px; font: var(--type-caption);
+    cursor: pointer; transition: background var(--transition);
+  }
+  .screen-nav button:hover, .screen-nav button.active { background: rgba(255,255,255,0.30); }
+
+  .screen { display: none; min-height: 100vh; }
+  .screen.active { display: block; }
+
+  /* ─── Top Nav Bar ────────────────────────────────────────── */
+  .app-nav {
+    background: var(--color-surface-raised); border-bottom: 1px solid var(--color-border);
+    display: flex; align-items: center; padding: 0 var(--space-12); height: 56px; gap: var(--space-6);
+  }
+  .app-logo { font: 700 18px/1 'Inter',sans-serif; color: var(--color-accent-primary); letter-spacing: -0.02em; }
+  .app-logo span { color: var(--color-text-secondary); font-weight: 400; }
+  .search-bar {
+    flex: 1; max-width: 380px; display: flex; gap: var(--space-2);
+    background: var(--color-surface-base); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); overflow: hidden; align-items: center; padding: 0 var(--space-3);
+  }
+  .search-bar input {
+    border: none; background: transparent; flex: 1; font: var(--type-body); padding: var(--space-2) 0;
+    color: var(--color-text-primary); outline: none;
+  }
+  .search-bar input::placeholder { color: var(--color-text-tertiary); }
+  .btn-primary {
+    background: var(--color-accent-primary); color: #fff; border: none;
+    padding: 6px 16px; border-radius: var(--radius-sm); font: 500 13px/1 'Inter',sans-serif;
+    cursor: pointer; transition: opacity var(--transition);
+  }
+  .btn-primary:hover { opacity: 0.88; }
+
+  /* ─── Page Container ─────────────────────────────────────── */
+  .page { max-width: 1440px; margin: 0 auto; padding: var(--space-8) var(--space-12); }
+
+  /* ─── Screen 1: Landing ──────────────────────────────────── */
+  .landing-hero {
+    min-height: calc(100vh - 56px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: var(--space-16) var(--space-12);
+  }
+  .landing-eyebrow {
+    font: var(--type-caption); color: var(--color-text-tertiary);
+    letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: var(--space-4);
+  }
+  .landing-hero h1 {
+    font: 700 40px/1.15 'Inter',sans-serif; color: var(--color-text-primary);
+    letter-spacing: -0.025em; margin-bottom: var(--space-4); max-width: 560px;
+  }
+  .landing-hero p {
+    font: var(--type-body); color: var(--color-text-secondary);
+    max-width: 420px; margin-bottom: var(--space-8); line-height: 1.6;
+  }
+  .landing-search {
+    display: flex; gap: var(--space-2); background: var(--color-surface-raised);
+    border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    overflow: hidden; align-items: center; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+    box-shadow: var(--shadow-card); width: 440px; max-width: 100%;
+  }
+  .landing-search input {
+    flex: 1; border: none; background: transparent; font: 500 16px/1 'Inter',sans-serif;
+    color: var(--color-text-primary); outline: none; padding: var(--space-2) 0;
+  }
+  .landing-search input::placeholder { color: var(--color-text-tertiary); font-weight: 400; }
+  .landing-chips { display: flex; gap: var(--space-2); margin-top: var(--space-4); flex-wrap: wrap; justify-content: center; }
+  .chip {
+    font: var(--type-caption); color: var(--color-text-secondary);
+    background: var(--color-surface-raised); border: 1px solid var(--color-border);
+    padding: 4px 10px; border-radius: 20px; cursor: pointer; transition: border-color var(--transition);
+  }
+  .chip:hover { border-color: var(--color-accent-primary); color: var(--color-accent-primary); }
+  .landing-tagline { font: var(--type-caption); color: var(--color-text-tertiary); margin-top: var(--space-8); }
+
+  /* ─── Screen 2: Progress Feed ────────────────────────────── */
+  .progress-page { max-width: 600px; margin: 0 auto; padding: var(--space-12) var(--space-6); }
+  .progress-company { margin-bottom: var(--space-8); }
+  .progress-company .ticker { font: 700 28px/1 'Inter',sans-serif; color: var(--color-text-primary); letter-spacing: -0.02em; }
+  .progress-company .name { font: var(--type-body); color: var(--color-text-secondary); margin-top: var(--space-1); }
+  .progress-feed-label { font: var(--type-caption); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-tertiary); margin-bottom: var(--space-4); }
+  .progress-feed {
+    background: var(--color-surface-raised); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); overflow: hidden;
+  }
+  .progress-item {
+    padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--color-border);
+    display: flex; gap: var(--space-4); align-items: flex-start;
+  }
+  .progress-item:last-child { border-bottom: none; }
+  .progress-item .dot {
+    width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0;
+  }
+  .dot-done { background: var(--color-verdict-delivered-text); }
+  .dot-active {
+    background: var(--color-accent-primary);
+    box-shadow: 0 0 0 3px var(--color-accent-primary-light);
+    animation: pulse 1.4s ease infinite;
+  }
+  .dot-pending { background: var(--color-border); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .progress-item .msg { font: var(--type-body); color: var(--color-text-primary); }
+  .progress-item .msg.muted { color: var(--color-text-tertiary); }
+  .progress-item .ts { font: var(--type-caption); color: var(--color-text-tertiary); margin-top: 2px; }
+  .progress-counter {
+    padding: var(--space-4) var(--space-6);
+    font: var(--type-caption); color: var(--color-text-secondary);
+    display: flex; align-items: center; gap: var(--space-3);
+  }
+  .progress-bar-outer { flex: 1; height: 3px; background: var(--color-border); border-radius: 2px; }
+  .progress-bar-inner { height: 100%; width: 42%; background: var(--color-accent-primary); border-radius: 2px; transition: width 0.4s ease; }
+
+  /* ─── Screen 3: Dashboard ────────────────────────────────── */
+  .dashboard { display: grid; grid-template-columns: 300px 1fr; gap: var(--space-6); align-items: start; }
+
+  /* Score Card */
+  .score-card {
+    background: var(--color-surface-raised); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); padding: var(--space-6); box-shadow: var(--shadow-card);
+    position: sticky; top: calc(56px + 32px);
+  }
+  .score-company { margin-bottom: var(--space-6); padding-bottom: var(--space-4); border-bottom: 1px solid var(--color-border); }
+  .score-company .ticker { font: 700 22px/1 'Inter',sans-serif; letter-spacing: -0.02em; }
+  .score-company .ceo { font: var(--type-body-sm); color: var(--color-text-secondary); margin-top: var(--space-1); }
+  .score-company .meta { font: var(--type-caption); color: var(--color-text-tertiary); margin-top: var(--space-1); }
+  .score-ring-wrap { text-align: center; padding: var(--space-4) 0; }
+  .score-ring {
+    width: 120px; height: 120px; border-radius: 50%; margin: 0 auto var(--space-3);
+    background: conic-gradient(var(--color-accent-primary) 0% 72%, var(--color-accent-primary-light) 72% 100%);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .score-ring-inner {
+    width: 88px; height: 88px; border-radius: 50%;
+    background: var(--color-surface-raised);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .score-numeral { font: var(--type-display); color: var(--color-accent-primary); letter-spacing: -0.03em; }
+  .score-denom { font: var(--type-caption); color: var(--color-text-tertiary); }
+  .score-label { font: 600 13px/1 'Inter',sans-serif; color: var(--color-text-secondary); letter-spacing: 0.04em; }
+  .score-breakdown { margin-top: var(--space-6); display: flex; flex-direction: column; gap: var(--space-2); }
+  .score-row { display: flex; justify-content: space-between; align-items: center; }
+  .score-row-badge {
+    font: var(--type-caption); padding: 2px 8px; border-radius: 20px;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .score-row-count { font: 600 14px/1 'Inter',sans-serif; }
+  .score-meta { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-border); font: var(--type-caption); color: var(--color-text-tertiary); }
+
+  /* Timeline */
+  .timeline-col { display: flex; flex-direction: column; gap: var(--space-2); }
+  .timeline-year { font: var(--type-caption); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-tertiary); padding: var(--space-3) 0 var(--space-1); }
+  .claim-card {
+    background: var(--color-surface-raised); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: var(--space-4); cursor: pointer;
+    transition: box-shadow var(--transition), border-color var(--transition);
+    box-shadow: var(--shadow-card);
+  }
+  .claim-card:hover { border-color: var(--color-accent-primary); box-shadow: 0 0 0 2px var(--color-accent-primary-light); }
+  .claim-card.expanded { border-color: var(--color-accent-primary); box-shadow: 0 0 0 2px var(--color-accent-primary-light); }
+  .claim-header { display: flex; gap: var(--space-3); align-items: flex-start; }
+  .verdict-badge {
+    display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 20px;
+    font: 600 11px/1 'Inter',sans-serif; letter-spacing: 0.04em; flex-shrink: 0; margin-top: 1px;
+  }
+  .v-delivered { background: var(--color-verdict-delivered-bg); color: var(--color-verdict-delivered-text); }
+  .v-missed { background: var(--color-verdict-missed-bg); color: var(--color-verdict-missed-text); }
+  .v-pending { background: var(--color-verdict-pending-bg); color: var(--color-verdict-pending-text); }
+  .v-insufficient { background: var(--color-verdict-insufficient-bg); color: var(--color-verdict-insufficient-text); }
+  .v-revised { background: var(--color-verdict-revised-bg); color: var(--color-verdict-revised-text); }
+  .claim-body { flex: 1; min-width: 0; }
+  .claim-title { font: var(--type-h3); color: var(--color-text-primary); margin-bottom: var(--space-1); }
+  .claim-meta { font: var(--type-caption); color: var(--color-text-secondary); }
+  .claim-delta { font: 600 13px/1 'Inter',sans-serif; color: var(--color-text-secondary); text-align: right; flex-shrink: 0; margin-top: 2px; }
+  .claim-delta.neg { color: var(--color-verdict-missed-text); }
+  .claim-delta.pos { color: var(--color-verdict-delivered-text); }
+
+  /* Expanded claim detail */
+  .claim-detail {
+    margin-top: var(--space-4); padding-top: var(--space-4);
+    border-top: 1px solid var(--color-border); display: none;
+  }
+  .claim-card.expanded .claim-detail { display: block; }
+  .detail-quote {
+    font: var(--type-mono); color: var(--color-text-primary);
+    background: var(--color-surface-overlay); border-left: 3px solid var(--color-accent-primary);
+    padding: var(--space-3) var(--space-4); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    margin-bottom: var(--space-4); line-height: 1.6;
+  }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3) var(--space-6); margin-bottom: var(--space-4); }
+  .detail-field label { font: var(--type-caption); color: var(--color-text-tertiary); display: block; margin-bottom: 2px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .detail-field span { font: var(--type-body-sm); color: var(--color-text-primary); }
+  .detail-confidence { display: flex; align-items: center; gap: var(--space-2); }
+  .conf-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .conf-high { background: var(--color-verdict-delivered-text); }
+  .conf-low { background: var(--color-verdict-pending-text); }
+  .reasoning-toggle {
+    display: flex; align-items: center; gap: var(--space-2);
+    font: 500 13px/1 'Inter',sans-serif; color: var(--color-text-link);
+    cursor: pointer; margin-bottom: var(--space-3); width: fit-content;
+    border: none; background: none; padding: 0;
+  }
+  .reasoning-steps { display: flex; flex-direction: column; gap: var(--space-2); }
+  .reasoning-step {
+    display: flex; gap: var(--space-3); padding: var(--space-3) var(--space-3);
+    background: var(--color-surface-overlay); border-radius: var(--radius-sm);
+    align-items: flex-start;
+  }
+  .step-num {
+    font: 600 11px/1 'Inter',sans-serif; color: var(--color-text-tertiary);
+    background: var(--color-border); border-radius: 20px; padding: 2px 7px;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .step-body { font: var(--type-body-sm); color: var(--color-text-primary); line-height: 1.5; }
+  .step-citation {
+    display: inline-flex; align-items: center; gap: 4px;
+    font: var(--type-caption); color: var(--color-text-link);
+    background: var(--color-accent-primary-light); border-radius: var(--radius-sm);
+    padding: 2px 6px; margin-top: var(--space-1);
+    cursor: pointer; border: 1px solid rgba(30,58,95,0.15);
+  }
+  .step-citation:hover { text-decoration: underline; }
+  .edgar-icon { font-size: 10px; }
+  .detail-share {
+    display: flex; align-items: center; gap: var(--space-2);
+    font: var(--type-caption); color: var(--color-text-tertiary); margin-top: var(--space-4);
+    padding-top: var(--space-3); border-top: 1px solid var(--color-border);
+  }
+  .share-link { font: var(--type-caption); color: var(--color-text-link); cursor: pointer; }
+  .share-link:hover { text-decoration: underline; }
+
+  /* ─── Screen 4: Error / Not Found ────────────────────────── */
+  .error-page { max-width: 480px; margin: 0 auto; padding: var(--space-16) var(--space-6); text-align: center; }
+  .error-page .error-code { font: 700 64px/1 'Inter',sans-serif; color: var(--color-border); letter-spacing: -0.04em; }
+  .error-page h2 { font: var(--type-h1); margin: var(--space-4) 0 var(--space-2); }
+  .error-page p { font: var(--type-body); color: var(--color-text-secondary); margin-bottom: var(--space-6); }
+  .error-page .hint { font: var(--type-caption); color: var(--color-text-tertiary); margin-top: var(--space-4); }
+
+  /* ─── Screen 5: Insufficient Data ───────────────────────── */
+  .state-banner {
+    background: var(--color-verdict-insufficient-bg); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: var(--space-4) var(--space-6);
+    margin-bottom: var(--space-6); display: flex; gap: var(--space-4); align-items: flex-start;
+  }
+  .state-icon { font-size: 20px; flex-shrink: 0; }
+  .state-body h4 { font: var(--type-h3); color: var(--color-verdict-insufficient-text); margin-bottom: var(--space-1); }
+  .state-body p { font: var(--type-body-sm); color: var(--color-text-secondary); }
+
+  /* ─── Utility ────────────────────────────────────────────── */
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+  .mt-2 { margin-top: var(--space-2); }
+  .mt-4 { margin-top: var(--space-4); }
+  .text-sm { font: var(--type-body-sm); }
+  .text-tertiary { color: var(--color-text-tertiary); }
+</style>
+</head>
+<body>
+
+<!-- ─── Navigation ──────────────────────────────────────────── -->
+<nav class="screen-nav" aria-label="Design direction screens">
+  <h1>BullByte — Design Directions</h1>
+  <button class="active" onclick="show('s1')">① Landing</button>
+  <button onclick="show('s2')">② Analysis in Progress</button>
+  <button onclick="show('s3')">③ Dashboard + Claim Detail</button>
+  <button onclick="show('s4')">④ Not Found</button>
+  <button onclick="show('s5')">⑤ Insufficient Data State</button>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Screen 1: Landing / Search                                  -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="s1" class="screen active" aria-label="Landing page">
+  <nav class="app-nav">
+    <span class="app-logo">Bull<span>Byte</span></span>
+  </nav>
+  <div class="landing-hero">
+    <p class="landing-eyebrow">CEO Accountability Research</p>
+    <h1>Did they deliver on their promises?</h1>
+    <p>BullByte cross-references every management claim against SEC filings — automatically, with primary-source citations.</p>
+    <div class="landing-search" role="search">
+      <input type="text" placeholder="Enter ticker symbol (e.g. AAPL)" aria-label="Company ticker symbol" value="" />
+      <button class="btn-primary" type="button">Analyse</button>
+    </div>
+    <div class="landing-chips" aria-label="Recent examples">
+      <span class="chip">AAPL</span>
+      <span class="chip">TSLA</span>
+      <span class="chip">NVDA</span>
+      <span class="chip">META</span>
+      <span class="chip">MSFT</span>
+    </div>
+    <p class="landing-tagline">No account required · Results cached for 7 days · Sources: SEC EDGAR</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Screen 2: Analysis Progress Feed                            -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="s2" class="screen" aria-label="Analysis in progress">
+  <nav class="app-nav">
+    <span class="app-logo">Bull<span>Byte</span></span>
+    <div class="search-bar">
+      <input type="text" value="AAPL" aria-label="Ticker" />
+      <button class="btn-primary" type="button">Go</button>
+    </div>
+  </nav>
+  <div class="page">
+    <div class="progress-page">
+      <div class="progress-company">
+        <div class="ticker">AAPL</div>
+        <div class="name">Apple Inc. · CEO: Tim Cook</div>
+      </div>
+      <p class="progress-feed-label">Analysing — live progress</p>
+      <div class="progress-feed" role="log" aria-live="polite" aria-label="Analysis progress">
+        <div class="progress-item">
+          <div class="dot dot-done" aria-hidden="true"></div>
+          <div>
+            <div class="msg">Queried SEC EDGAR — found 12 quarterly filings (Q1 2022 – Q4 2024)</div>
+            <div class="ts">0:04</div>
+          </div>
+        </div>
+        <div class="progress-item">
+          <div class="dot dot-done" aria-hidden="true"></div>
+          <div>
+            <div class="msg">Extracted 3 earnings call transcripts from Q3–Q4 2024</div>
+            <div class="ts">0:18</div>
+          </div>
+        </div>
+        <div class="progress-item">
+          <div class="dot dot-done" aria-hidden="true"></div>
+          <div>
+            <div class="msg">Identified 19 forward-looking statements across 5 quarters</div>
+            <div class="ts">0:41</div>
+          </div>
+        </div>
+        <div class="progress-item">
+          <div class="dot dot-active" aria-hidden="true"></div>
+          <div>
+            <div class="msg">Verifying claim 8 of 19 — cross-referencing Q3 2024 10-Q §MD&amp;A…</div>
+            <div class="ts">1:12</div>
+          </div>
+        </div>
+        <div class="progress-item">
+          <div class="dot dot-pending" aria-hidden="true"></div>
+          <div>
+            <div class="msg muted">Scoring and finalising CEO Delivery Score</div>
+            <div class="ts">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="progress-counter" aria-label="8 of 19 claims verified">
+        <span>Claim 8 of 19</span>
+        <div class="progress-bar-outer" role="progressbar" aria-valuenow="42" aria-valuemin="0" aria-valuemax="100">
+          <div class="progress-bar-inner"></div>
+        </div>
+        <span>42%</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Screen 3: Dashboard + Inline Claim Detail                   -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="s3" class="screen" aria-label="Results dashboard">
+  <nav class="app-nav">
+    <span class="app-logo">Bull<span>Byte</span></span>
+    <div class="search-bar">
+      <input type="text" value="AAPL" aria-label="Ticker" />
+      <button class="btn-primary" type="button">Go</button>
+    </div>
+  </nav>
+  <div class="page">
+    <div class="dashboard">
+
+      <!-- Score Card (left column) -->
+      <aside>
+        <div class="score-card">
+          <div class="score-company">
+            <div class="ticker">AAPL</div>
+            <div class="ceo">Tim Cook, CEO</div>
+            <div class="meta">Apple Inc. · Analysed 29 Apr 2026</div>
+          </div>
+          <div class="score-ring-wrap">
+            <div class="score-ring" role="img" aria-label="CEO Delivery Score: 72 out of 100">
+              <div class="score-ring-inner">
+                <span class="score-numeral">72</span>
+                <span class="score-denom">/100</span>
+              </div>
+            </div>
+            <div class="score-label">CEO Delivery Score</div>
+          </div>
+          <div class="score-breakdown">
+            <div class="score-row">
+              <span class="verdict-badge v-delivered">DELIVERED</span>
+              <span class="score-row-count">11</span>
+            </div>
+            <div class="score-row">
+              <span class="verdict-badge v-missed">MISSED</span>
+              <span class="score-row-count">4</span>
+            </div>
+            <div class="score-row">
+              <span class="verdict-badge v-revised">REVISED</span>
+              <span class="score-row-count">2</span>
+            </div>
+            <div class="score-row">
+              <span class="verdict-badge v-pending">PENDING</span>
+              <span class="score-row-count">1</span>
+            </div>
+            <div class="score-row">
+              <span class="verdict-badge v-insufficient">INSUFFICIENT DATA</span>
+              <span class="score-row-count">1</span>
+            </div>
+          </div>
+          <div class="score-meta">19 claims tracked · Q1 2022 – Q4 2024 · Sources: SEC EDGAR</div>
+        </div>
+      </aside>
+
+      <!-- Timeline (right column) -->
+      <main>
+        <div class="timeline-col" aria-label="Promise timeline">
+
+          <div class="timeline-year">2024</div>
+
+          <!-- Expanded claim card (with reasoning trace visible) -->
+          <article class="claim-card expanded" aria-expanded="true">
+            <div class="claim-header">
+              <div class="verdict-badge v-missed" aria-label="Verdict: MISSED">MISSED</div>
+              <div class="claim-body">
+                <div class="claim-title">Vision Pro will reach 1M units in first year</div>
+                <div class="claim-meta">Tim Cook · Q4 2023 Earnings Call · Oct 2023</div>
+              </div>
+              <div class="claim-delta neg" aria-label="Delta: negative $320 thousand units">−320K units</div>
+            </div>
+            <div class="claim-detail" aria-label="Claim detail">
+              <div class="detail-quote" aria-label="Original claim quote">
+                "We anticipate Vision Pro to reach one million units by the end of fiscal 2024 as spatial computing finds its initial consumer base."
+              </div>
+              <div class="detail-grid">
+                <div class="detail-field">
+                  <label>Promised</label>
+                  <span>~1,000,000 units FY2024</span>
+                </div>
+                <div class="detail-field">
+                  <label>Actual</label>
+                  <span>~680,000 units (est.)</span>
+                </div>
+                <div class="detail-field">
+                  <label>Reported in</label>
+                  <span>Q4 2024 10-K · Nov 2024</span>
+                </div>
+                <div class="detail-field">
+                  <label>Confidence</label>
+                  <div class="detail-confidence">
+                    <div class="conf-dot conf-low" aria-hidden="true"></div>
+                    <span>Low — unit sales not disclosed; based on analyst triangulation</span>
+                  </div>
+                </div>
+              </div>
+              <button class="reasoning-toggle" aria-expanded="true" aria-controls="reasoning-1">
+                ▾ Reasoning trace (3 steps)
+              </button>
+              <div class="reasoning-steps" id="reasoning-1">
+                <div class="reasoning-step">
+                  <div class="step-num">1</div>
+                  <div class="step-body">
+                    Located original claim in Q4 2023 earnings call transcript. Cook stated "approximately one million units" as a 12-month target.
+                    <br />
+                    <a class="step-citation" href="#" aria-label="View Q4 2023 Earnings Transcript on SEC EDGAR (opens in new tab)" target="_blank" rel="noopener">
+                      <span class="edgar-icon">↗</span> Q4 2023 Earnings Transcript · EDGAR 8-K
+                    </a>
+                  </div>
+                </div>
+                <div class="reasoning-step">
+                  <div class="step-num">2</div>
+                  <div class="step-body">
+                    Apple does not disclose Vision Pro unit sales in 10-K filings. Revenue contribution is bundled into "Other Products" segment.
+                    <br />
+                    <a class="step-citation" href="#" aria-label="View Q4 2024 10-K Other Products segment (opens in new tab)" target="_blank" rel="noopener">
+                      <span class="edgar-icon">↗</span> Q4 2024 10-K · Other Products §
+                    </a>
+                  </div>
+                </div>
+                <div class="reasoning-step">
+                  <div class="step-num">3</div>
+                  <div class="step-body">
+                    Using IDC and Counterpoint Research estimates cited in Q4 2024 8-K risk factors, estimated ~680K units shipped — 32% below the stated target. Verdict: MISSED with low confidence due to absence of primary unit disclosure.
+                    <br />
+                    <a class="step-citation" href="#" aria-label="View Q4 2024 8-K risk factors (opens in new tab)" target="_blank" rel="noopener">
+                      <span class="edgar-icon">↗</span> Q4 2024 8-K · Risk Factors
+                    </a>
+                  </div>
+                </div>
+              </div>
+              <div class="detail-share">
+                <span>Permalink:</span>
+                <a class="share-link" href="#" aria-label="Copy permalink for this claim">bullbyte.io/aapl/claim/vp-1m-fy24 ↗</a>
+              </div>
+            </div>
+          </article>
+
+          <!-- Collapsed cards -->
+          <article class="claim-card" tabindex="0" role="button" aria-expanded="false" aria-label="Click to expand: Services revenue $100B — DELIVERED">
+            <div class="claim-header">
+              <div class="verdict-badge v-delivered">DELIVERED</div>
+              <div class="claim-body">
+                <div class="claim-title">Services revenue to reach $100B run rate</div>
+                <div class="claim-meta">Tim Cook · Q2 2023 Earnings Call · Apr 2023</div>
+              </div>
+              <div class="claim-delta pos">+$8.2B</div>
+            </div>
+          </article>
+
+          <article class="claim-card" tabindex="0" role="button" aria-expanded="false" aria-label="Click to expand: India manufacturing 25% — REVISED">
+            <div class="claim-header">
+              <div class="verdict-badge v-revised">REVISED</div>
+              <div class="claim-body">
+                <div class="claim-title">India to manufacture 25% of all iPhones by 2025</div>
+                <div class="claim-meta">Tim Cook · Q3 2023 Earnings Call · Jul 2023</div>
+              </div>
+              <div class="claim-delta">— revised</div>
+            </div>
+          </article>
+
+          <div class="timeline-year">2023</div>
+
+          <article class="claim-card" tabindex="0" role="button" aria-expanded="false" aria-label="Click to expand: Gross margin expansion — DELIVERED">
+            <div class="claim-header">
+              <div class="verdict-badge v-delivered">DELIVERED</div>
+              <div class="claim-body">
+                <div class="claim-title">Gross margin expansion to 44–45% for FY2023</div>
+                <div class="claim-meta">Luca Maestri · Q1 2023 Earnings Call · Jan 2023</div>
+              </div>
+              <div class="claim-delta pos">+0.8 pp</div>
+            </div>
+          </article>
+
+          <article class="claim-card" tabindex="0" role="button" aria-expanded="false" aria-label="Click to expand: China revenue recovery — INSUFFICIENT DATA">
+            <div class="claim-header">
+              <div class="verdict-badge v-insufficient">INSUFFICIENT DATA</div>
+              <div class="claim-body">
+                <div class="claim-title">China market recovery to pre-2022 levels</div>
+                <div class="claim-meta">Tim Cook · Q4 2022 Earnings Call · Oct 2022</div>
+              </div>
+              <div class="claim-delta">—</div>
+            </div>
+          </article>
+
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Screen 4: Ticker Not Found                                  -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="s4" class="screen" aria-label="Ticker not found">
+  <nav class="app-nav">
+    <span class="app-logo">Bull<span>Byte</span></span>
+    <div class="search-bar">
+      <input type="text" value="XYZQ" aria-label="Ticker" />
+      <button class="btn-primary" type="button">Go</button>
+    </div>
+  </nav>
+  <div class="page">
+    <div class="error-page">
+      <div class="error-code" aria-hidden="true">404</div>
+      <h2>Ticker not found</h2>
+      <p><strong>XYZQ</strong> doesn't appear to be a listed US company with SEC EDGAR filings. Check the ticker and try again.</p>
+      <button class="btn-primary" type="button">Try another ticker</button>
+      <p class="hint">BullByte covers S&amp;P 500 companies with at least 4 quarters of 10-Q/10-K filings on EDGAR.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Screen 5: Insufficient Data State (Dashboard variant)       -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="s5" class="screen" aria-label="Insufficient data example">
+  <nav class="app-nav">
+    <span class="app-logo">Bull<span>Byte</span></span>
+    <div class="search-bar">
+      <input type="text" value="RIVN" aria-label="Ticker" />
+      <button class="btn-primary" type="button">Go</button>
+    </div>
+  </nav>
+  <div class="page">
+    <div class="dashboard">
+      <aside>
+        <div class="score-card">
+          <div class="score-company">
+            <div class="ticker">RIVN</div>
+            <div class="ceo">RJ Scaringe, CEO</div>
+            <div class="meta">Rivian Automotive · Analysed 29 Apr 2026</div>
+          </div>
+          <div class="score-ring-wrap">
+            <div class="score-ring" role="img" aria-label="CEO Delivery Score: 48 out of 100" style="background: conic-gradient(var(--color-accent-primary) 0% 48%, var(--color-accent-primary-light) 48% 100%)">
+              <div class="score-ring-inner">
+                <span class="score-numeral">48</span>
+                <span class="score-denom">/100</span>
+              </div>
+            </div>
+            <div class="score-label">CEO Delivery Score</div>
+          </div>
+          <div class="score-breakdown">
+            <div class="score-row"><span class="verdict-badge v-delivered">DELIVERED</span><span class="score-row-count">5</span></div>
+            <div class="score-row"><span class="verdict-badge v-missed">MISSED</span><span class="score-row-count">7</span></div>
+            <div class="score-row"><span class="verdict-badge v-pending">PENDING</span><span class="score-row-count">2</span></div>
+            <div class="score-row"><span class="verdict-badge v-insufficient">INSUFFICIENT DATA</span><span class="score-row-count">3</span></div>
+          </div>
+          <div class="score-meta">17 claims tracked · Q3 2021 – Q4 2024 · Sources: SEC EDGAR</div>
+        </div>
+      </aside>
+      <main>
+        <div class="timeline-col">
+          <div class="timeline-year">2024</div>
+          <div class="state-banner" role="note" aria-label="Data availability notice">
+            <div class="state-icon" aria-hidden="true">ℹ</div>
+            <div class="state-body">
+              <h4>Some claims lack verifiable data</h4>
+              <p>3 claims reference production targets Rivian did not disclose in EDGAR filings. BullByte marks these as Insufficient Data rather than guessing. Primary source links are still provided where partial data exists.</p>
+            </div>
+          </div>
+          <article class="claim-card">
+            <div class="claim-header">
+              <div class="verdict-badge v-insufficient">INSUFFICIENT DATA</div>
+              <div class="claim-body">
+                <div class="claim-title">Deliver 50,000 vehicles in 2023</div>
+                <div class="claim-meta">RJ Scaringe · Q4 2022 Earnings Call · Feb 2023</div>
+              </div>
+              <div class="claim-delta">—</div>
+            </div>
+          </article>
+          <article class="claim-card">
+            <div class="claim-header">
+              <div class="verdict-badge v-missed">MISSED</div>
+              <div class="claim-body">
+                <div class="claim-title">Achieve gross profit positive by Q3 2024</div>
+                <div class="claim-meta">RJ Scaringe · Q2 2023 Earnings Call · Aug 2023</div>
+              </div>
+              <div class="claim-delta neg">−$1.1B gross loss</div>
+            </div>
+          </article>
+          <article class="claim-card">
+            <div class="claim-header">
+              <div class="verdict-badge v-pending">PENDING</div>
+              <div class="claim-body">
+                <div class="claim-title">Launch R2 platform in 2026</div>
+                <div class="claim-meta">RJ Scaringe · Q1 2024 Earnings Call · May 2024</div>
+              </div>
+              <div class="claim-delta">Due 2026</div>
+            </div>
+          </article>
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+<script>
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.screen-nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    event.target.classList.add('active');
+  }
+</script>
+</body>
+</html>
