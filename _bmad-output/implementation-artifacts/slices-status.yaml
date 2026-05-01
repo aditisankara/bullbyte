@@ -1,0 +1,386 @@
+# generated: 2026-05-01
+# last_updated: 2026-05-01
+# project: bullbyte
+# project_key: NOKEY
+# tracking_system: file-system
+# slice_definitions: _bmad-output/planning-artifacts/slices.md
+# story_definitions: _bmad-output/planning-artifacts/epics.md   # Epic 1 + Epic 2 only — Epics 3-6 superseded by slices.md
+# dev_plan: _bmad-output/planning-artifacts/dev-plan.md
+# supersedes: sprint-status.yaml (for Epics 3-6 tracking only — Epic 1 + Epic 2 status here is canonical going forward)
+
+# STATUS DEFINITIONS:
+# ==================
+# Slice / Story status:
+#   - backlog:        not started
+#   - ready-for-dev:  pre-work done (sync points settled, dependencies merged), can start now
+#   - in-progress:    developer is actively coding
+#   - review:         PR open; awaiting code review AND workflow review (both required, see dev-plan.md)
+#   - done:           both reviews signed off; merged to main
+#   - deferred:       intentionally not in Phase 1 scope (e.g. Epic 2 stories 2.3-2.6)
+#
+# Sync point status:
+#   - pending:        not yet drafted
+#   - drafted:        owner has produced a draft; awaiting approval
+#   - approved:       both devs signed off; locked
+#
+# Review status (per slice/story PR):
+#   - code-review:    not started | in-progress | done
+#   - workflow-review: not started | in-progress | done
+#   A slice is `done` only when BOTH reviews are `done`.
+
+# OWNERSHIP MODEL:
+# ================
+# Both devs are full-stack. Ownership is per-slice, not per-layer.
+# Reviewer is always the non-author dev.
+# Single-owner file declarations live in slices.md and apply across all of Phase 1.
+
+# PARALLEL PLANNING NOTES:
+# ========================
+# Pickup order (pick highest-priority unblocked slice you own, not the other dev's):
+#
+# PHASE 1A — Foundation (Epic 1, layered)
+#   STEP 1: 1.1                              (Dev 1)  →  unblocks all
+#   STEP 2 (parallel after 1.1):
+#     Dev 1: 1.3 → 1.4
+#     Dev 2: 1.2 (with SP1 schema lock) ║ 1.5 ║ 1.6
+#
+# PHASE 1B — Design slice (Epic 2, slimmed)
+#   Dev 2: 2.1 → 2.2 (before S0-FE starts)
+#   2.3-2.6 are deferred — authored inline with their matching vertical slice.
+#
+# PHASE 1C — Walking skeleton (S0)
+#   Pre-work: SP1 + SP2 + SP3 + SP4 must all be `approved` before S0 sub-slices merge.
+#   Both devs work in parallel:
+#     Dev 1: s0-ml-stub + s0-api-scaffolding
+#     Dev 2: s0-fe-shell + s0-db-schema-seed
+#   S0 is `done` only when all four sub-slices are `done` AND a fresh `docker compose up`
+#   demonstrates end-to-end canned-data flow.
+#
+# PHASE 1D — Vertical slices (parallel where possible)
+#   After S0:
+#     Dev 1: s1a → s2 → s4 → s6a
+#     Dev 2: s1b → s3 → s5 → s6b
+#   Parallel windows:
+#     - s1a ‖ s1b (after S0)
+#     - s2 ‖ s3 (after s1a; s2 also needs s1b)
+#     - During s4 (Dev 1 deep work), Dev 2 preps s5 against canned shapes from S0
+#     - During s5 (Dev 2), Dev 1 starts s6a
+#   s6c (demo dry-run) is co-owned and caps Phase 1.
+#
+# PICK-UP RULE: take your next slice the moment its dependencies are `done`.
+# If your next slice is blocked, pick up review work for the other dev, OR
+# advance prep work (write tests against canned shapes from S0).
+
+generated: "2026-05-01"
+last_updated: "2026-05-01"
+project: bullbyte
+project_key: NOKEY
+tracking_system: file-system
+slice_definitions: _bmad-output/planning-artifacts/slices.md
+story_definitions: _bmad-output/planning-artifacts/epics.md
+dev_plan: _bmad-output/planning-artifacts/dev-plan.md
+
+# Single-owner file declarations (mirrored from slices.md — informational here)
+single_owner_files:
+  api/src/db/schema.ts: dev-2
+  ml-sidecar/src/core/edgar_client.py: dev-1
+  ml-sidecar/src/core/llm/base.py: dev-1
+  ml-sidecar/src/services/extraction_service.py: dev-2
+  ml-sidecar/src/services/verification_service.py: dev-1
+  api/src/common/ml-sidecar.service.ts: dev-1
+  shared-sse-event-types: dev-2
+  shared-api-dto-types: dev-2
+
+# Cross-team sync points (gating deliverables — see dev-plan.md)
+sync_points:
+  sp1-schema-lock:
+    status: pending
+    drafter: dev-2
+    approver: dev-1
+    gate: "before 1.2 merges"
+    artifact: "api/src/db/schema.ts (final)"
+
+  sp2-canonical-enum-lock:
+    status: pending
+    drafter: dev-1
+    approver: dev-2
+    gate: "before S0 merges"
+    artifact: "shared enum doc — verdicts, job statuses, quarter format, confidence range"
+
+  sp3-webhook-contract:
+    status: pending
+    drafter: dev-1
+    approver: dev-2
+    gate: "before S0 merges"
+    artifact: "POST /internal/jobs/:jobId/progress payload — TypeScript + Pydantic types"
+
+  sp4-canned-data-contract:
+    status: pending
+    drafter: dev-1
+    approver: dev-2
+    gate: "before S0 merges"
+    artifact: "S0 canned analysis output JSON shape — claims, verdicts, reasoning trace"
+
+  sp5-cache-contract:
+    status: pending
+    drafter: dev-1
+    approver: dev-2
+    gate: "during S1A + S1B"
+    artifact: "cache key + invalidation rules — documented in S1A and S1B PRs"
+
+  sp6-end-to-end-demo-run:
+    status: pending
+    drafter: both
+    approver: both
+    gate: "S6-C completion"
+    artifact: "fresh-stack run of all 5 demo tickers (TSLA, AAPL, SPOT, META, NVDA); J1 + J3 walkthroughs recorded"
+
+development_status:
+
+  # ─────────────────────────────────────────────────────────────
+  # EPIC 1 — Project Foundation & Environment Setup (layered, per epics.md)
+  # PRIORITY: Start here. 1.1 must land before anything else.
+  # ─────────────────────────────────────────────────────────────
+  epic-1: in-progress
+
+  1-1-docker-compose-stack-and-environment-configuration:
+    status: review
+    owner: dev-1
+    reviewer: dev-2
+    code_review: in-progress
+    workflow_review: not-started
+    blocked_by: []
+    unblocks: [1-2, 1-3, 1-4, 1-5, 1-6]
+
+  1-2-postgresql-schema-and-drizzle-migration-infrastructure:
+    status: backlog
+    owner: dev-2
+    reviewer: dev-1
+    blocked_by: [1-1]
+    unblocks: [s0]
+    notes: "Schema lock checkpoint (sp1). Dev 2 owns api/src/db/schema.ts for all of Phase 1."
+
+  1-3-fastapi-ml-sidecar-scaffold:
+    status: backlog
+    owner: dev-1
+    reviewer: dev-2
+    blocked_by: [1-1]
+    unblocks: [s0]
+    notes: "Includes LLM abstraction skeleton. Dev 1 owns ml-sidecar/src/core/llm/base.py."
+
+  1-4-nestjs-api-scaffold-and-core-infrastructure:
+    status: backlog
+    owner: dev-1
+    reviewer: dev-2
+    blocked_by: [1-1]
+    unblocks: [s0]
+    notes: "Includes MlSidecarService. Dev 1 owns api/src/common/ml-sidecar.service.ts."
+
+  1-5-angular-spa-scaffold-and-routing-shell:
+    status: backlog
+    owner: dev-2
+    reviewer: dev-1
+    blocked_by: [1-1]
+    unblocks: [s0]
+
+  1-6-github-actions-ci-cd-pipeline:
+    status: backlog
+    owner: dev-2
+    reviewer: dev-1
+    blocked_by: [1-1]
+    unblocks: []
+    notes: "Pick up between 1.5 and S0."
+
+  epic-1-retrospective: optional
+
+  # ─────────────────────────────────────────────────────────────
+  # EPIC 2 — UI Design System (slimmed; per epics.md + dev-plan.md)
+  # PRIORITY: 2.1 + 2.2 only — 2.3-2.6 deferred and authored inline with their slice.
+  # ─────────────────────────────────────────────────────────────
+  epic-2: backlog
+
+  2-1-design-token-system:
+    status: backlog
+    owner: dev-2
+    reviewer: dev-1
+    blocked_by: [1-1]
+    unblocks: [2-2, s0]
+    notes: "Run before S0-FE."
+
+  2-2-core-shared-component-specs:
+    status: backlog
+    owner: dev-2
+    reviewer: dev-1
+    blocked_by: [2-1]
+    unblocks: [s0]
+
+  2-3-search-page-and-analysis-progress-feed-specs:
+    status: deferred
+    notes: "Authored inline with S0-FE."
+  2-4-promise-timeline-and-claim-card-specs:
+    status: deferred
+    notes: "Authored inline with S3 (real claims on timeline)."
+  2-5-claim-detail-panel-and-reasoning-trace-specs:
+    status: deferred
+    notes: "Authored inline with S4."
+  2-6-ceo-score-card-and-responsive-layout-specs:
+    status: deferred
+    notes: "Authored inline with S5 + S6-B."
+
+  epic-2-retrospective: optional
+
+  # ─────────────────────────────────────────────────────────────
+  # VERTICAL SLICES (replaces Epics 3-6 from epics.md)
+  # PRIORITY: S0 first; then S1A ‖ S1B; then S2 ‖ S3; then S4; then S5; then S6.
+  # Each slice is end-to-end and author-verifiable in the running stack.
+  # ─────────────────────────────────────────────────────────────
+  slices: backlog
+
+  # ─── S0 — Walking skeleton (canned data, real wiring) ────────
+  s0-walking-skeleton:
+    status: backlog
+    owners: [dev-1, dev-2]
+    blocked_by: [1-2, 1-3, 1-4, 1-5, 2-1, 2-2]
+    blocks: [s1a, s1b, s3]
+    sync_points_required: [sp1, sp2, sp3, sp4]
+    fr_coverage: "wiring only — no FR fully satisfied yet"
+    acceptance_summary: "Search DEMO ticker → live progress feed → company page renders canned timeline + score + claim detail + reasoning trace. Real EventSource, real DB read, no real EDGAR/LLM calls."
+
+    sub_slices:
+      s0-ml-stub:
+        status: backlog
+        owner: dev-1
+        reviewer: dev-2
+        notes: "FastAPI /analyze/{ticker} fires 5 canned webhook events over ~10s, then analysis-complete."
+      s0-api-scaffolding:
+        status: backlog
+        owner: dev-1
+        reviewer: dev-2
+        notes: "BullMQ, SSE endpoint, webhook receiver, all REST endpoints stubbed returning canned data."
+      s0-fe-shell:
+        status: backlog
+        owner: dev-2
+        reviewer: dev-1
+        notes: "Search page, company page shell, all components, EventSource client. Consumes canned API."
+      s0-db-schema-seed:
+        status: backlog
+        owner: dev-2
+        reviewer: dev-1
+        notes: "Drizzle schema final (if 1.2 didn't already finalise). Seed script inserts canned DEMO ticker."
+
+  # ─── S1A — 8-K transcripts E2E ───────────────────────────────
+  s1a-8k-transcripts-ingest-e2e:
+    status: backlog
+    owner: dev-1
+    reviewer: dev-2
+    blocked_by: [s0]
+    blocks: [s2, s3]
+    sync_points_required: [sp5]
+    fr_coverage: [fr1, fr4-partial, fr5-transcripts, fr38]
+    establishes_ownership: ["ml-sidecar/src/core/edgar_client.py"]
+    acceptance_summary: "Search TSLA → real EDGAR 8-K transcripts ingested for 8 quarters → cached → visible as 'N transcripts ingested' badge + real EDGAR URLs on claim cards. Cache hit on 2nd run."
+
+  # ─── S1B — 10-Q/10-K actuals E2E ─────────────────────────────
+  s1b-10q-10k-actuals-ingest-e2e:
+    status: backlog
+    owner: dev-2
+    reviewer: dev-1
+    blocked_by: [s0]
+    parallel_with: [s1a]
+    blocks: [s2]
+    sync_points_required: [sp5]
+    fr_coverage: [fr2, fr5-actuals]
+    consumes: ["ml-sidecar/src/core/edgar_client.py (owned by dev-1)"]
+    acceptance_summary: "Search TSLA → real 10-Q/10-K filings parsed → 'N actuals ingested' badge → claim cards show real metric values next to canned target. Cache hit on 2nd run."
+
+  # ─── S2 — Temporal alignment E2E ─────────────────────────────
+  s2-temporal-alignment-e2e:
+    status: backlog
+    owner: dev-1
+    reviewer: dev-2
+    blocked_by: [s1a, s1b]
+    blocks: [s4]
+    fr_coverage: [fr3, fr4]
+    risk: "highest in Phase 1 — per prd.md:313. Allocate buffer."
+    acceptance_summary: "Click any claim → see alignment metadata block (actuals quarter, filing type, alignment confidence, rationale). PENDING claims rendered distinctly on timeline."
+
+  # ─── S3 — Claim extraction E2E ───────────────────────────────
+  s3-claim-extraction-e2e:
+    status: backlog
+    owner: dev-2
+    reviewer: dev-1
+    blocked_by: [s1a]
+    parallel_with: [s2]
+    blocks: [s4]
+    fr_coverage: [fr8, fr9, fr10, fr11]
+    establishes_ownership: ["ml-sidecar/src/services/extraction_service.py"]
+    cost_warning: "first slice making real LLM calls — monitor NFR18 cost logging."
+    acceptance_summary: "Real LLM-extracted claims appear on timeline, replacing canned ones. Speaker attribution + extraction confidence visible. Spot-check 2-3 quotes against real TSLA earnings call."
+
+  # ─── S4 — Verification + verdict + reasoning trace E2E ───────
+  s4-verification-verdict-reasoning-e2e:
+    status: backlog
+    owner: dev-1
+    reviewer: dev-2
+    blocked_by: [s2, s3]
+    blocks: [s5]
+    fr_coverage: [fr13, fr14, fr15, fr16, fr17, fr18, fr34, fr36, fr37, fr38, fr39, fr40, fr45]
+    establishes_ownership: ["ml-sidecar/src/services/verification_service.py"]
+    notes: "Largest slice in Phase 1. This is where BullByte becomes BullByte."
+    acceptance_summary: "Real verdicts (DELIVERED/MISSED/INSUFFICIENT_DATA) replace canned ones. Real-time progress feed shows verification steps. Reasoning trace expandable with real EDGAR citations. Low-confidence verdicts flagged."
+
+  # ─── S5 — CEO score E2E ──────────────────────────────────────
+  s5-ceo-score-e2e:
+    status: backlog
+    owner: dev-2
+    reviewer: dev-1
+    blocked_by: [s4]
+    blocks: [s6]
+    fr_coverage: [fr22, fr23, fr24]
+    prep_window: "Dev 2 may prep against canned verdict shapes during s4."
+    acceptance_summary: "Score card shows real fraction with sample-size context (e.g. '6 of 10 delivered. 3 pending.'). 'No resolved claims yet' shown for sparse-history tickers — never 0."
+
+  # ─── S6 — Polish + accessibility + demo dry-run ──────────────
+  s6-polish:
+    status: backlog
+    owners: [dev-1, dev-2]
+    blocked_by: [s5]
+    blocks: [phase-1-signoff]
+    fr_coverage: [fr6, fr41, nfr11, nfr20, nfr21, nfr22, nfr23]
+
+    sub_slices:
+      s6a-yfinance-cache-hardening:
+        status: backlog
+        owner: dev-1
+        reviewer: dev-2
+        notes: "yfinance supplement (FR6) + concurrency hardening (NFR11)."
+      s6b-shareable-urls-accessibility-audit:
+        status: backlog
+        owner: dev-2
+        reviewer: dev-1
+        notes: "Claim deep-link URLs (FR41), keyboard nav, semantic HTML, contrast, 320px viewport (NFR20-23)."
+      s6c-demo-dry-run:
+        status: backlog
+        owners: [dev-1, dev-2]
+        notes: "Process all 5 demo tickers (TSLA, AAPL, SPOT, META, NVDA) on a fresh stack. Sign off Phase 1 checklist in slices.md."
+
+  slices-retrospective: optional
+
+  # ─────────────────────────────────────────────────────────────
+  # PHASE 1 SIGN-OFF GATE
+  # ─────────────────────────────────────────────────────────────
+  phase-1-signoff:
+    status: backlog
+    blocked_by: [s6]
+    checklist_location: "slices.md → 'Phase 1 sign-off' section"
+    requires:
+      - all 5 demo tickers process end-to-end on fresh stack
+      - ≥50 verdicts manually spot-checked across the 5 tickers
+      - numerical verdict accuracy ≥78% on spot-checked set
+      - J1 (Priya) walkthrough end-to-end
+      - J3 (Rohan) walkthrough end-to-end
+      - J2 PENDING handling confirmed for sparse-history ticker
+      - disclaimer footer on every page
+      - no console.log, no hardcoded secrets, no PII collection
+      - accessibility audit (s6b) signed off
+      - demo run (s6c) recorded
