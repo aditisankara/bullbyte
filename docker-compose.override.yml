@@ -21,6 +21,8 @@ services:
     volumes:
       - ./api:/app
       - /app/node_modules
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/bullbyte
     command: ["npm", "run", "start:dev"]
 
   ml-sidecar:

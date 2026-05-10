@@ -5,7 +5,8 @@
 	"compilerOptions": {
 		"deleteOutDir": true,
 		"assets": [
-			{ "include": "db/migrations/**/*.sql", "watchAssets": true }
+			{ "include": "db/migrations/**/*.sql", "watchAssets": true },
+			{ "include": "db/migrations/meta/*.json", "watchAssets": true }
 		]
 	}
 }

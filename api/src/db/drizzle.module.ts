@@ -15,8 +15,11 @@ export type DrizzleDB = NodePgDatabase<typeof schema>;
 	providers: [
 		{
 			provide: DB_POOL,
-			useFactory: async (): Promise<Pool> => {
-				if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+			useFactory: (): Pool => {
+				if (
+					process.env.NODE_ENV === 'production' &&
+					!process.env.DATABASE_URL
+				) {
 					throw new Error('DATABASE_URL must be set in production');
 				}
 				return new Pool({

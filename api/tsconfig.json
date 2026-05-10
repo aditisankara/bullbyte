@@ -5,7 +5,6 @@
 		"resolvePackageJsonExports": true,
 		"esModuleInterop": true,
 		"isolatedModules": true,
-		"declaration": true,
 		"removeComments": true,
 		"emitDecoratorMetadata": true,
 		"experimentalDecorators": true,
@@ -13,7 +12,8 @@
 		"target": "ES2023",
 		"sourceMap": true,
 		"outDir": "./dist",
-		"baseUrl": "./",
+		"rootDir": "./src",
+		"tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo",
 		"incremental": true,
 		"skipLibCheck": true,
 		"strictNullChecks": true,
@@ -22,5 +22,6 @@
 		"strictBindCallApply": false,
 		"noFallthroughCasesInSwitch": false,
 		"types": ["jest", "node"]
-	}
+	},
+	"include": ["src/**/*"]
 }

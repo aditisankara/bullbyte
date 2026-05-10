@@ -1,5 +1,5 @@
-CREATE TYPE IF NOT EXISTS "public"."job_status" AS ENUM('QUEUED', 'RUNNING', 'COMPLETED', 'FAILED');--> statement-breakpoint
-CREATE TYPE IF NOT EXISTS "public"."verdict_type" AS ENUM('DELIVERED', 'MISSED', 'INSUFFICIENT_DATA', 'PENDING', 'REVISED');--> statement-breakpoint
+CREATE TYPE "public"."job_status" AS ENUM('QUEUED', 'RUNNING', 'COMPLETED', 'FAILED');--> statement-breakpoint
+CREATE TYPE "public"."verdict_type" AS ENUM('DELIVERED', 'MISSED', 'INSUFFICIENT_DATA', 'PENDING', 'REVISED');--> statement-breakpoint
 CREATE TABLE "companies" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"ticker" text NOT NULL,
