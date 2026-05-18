@@ -25,3 +25,15 @@
 - Hardcoded postgres password `postgres` in `docker-compose.yml` `environment:` block and `DATABASE_URL` — replace with a secret before deployment
 - nginx performance tuning absent — no `gzip`, `sendfile`, or cache headers; address in Epic 6 / production hardening
 - No graceful shutdown signal handling — NestJS `enableShutdownHooks()` not called; address in production hardening story
+
+## Deferred from: code review of 1-3-fastapi-ml-sidecar-scaffold (2026-05-18)
+
+- `_split_system` silently keeps only the last system-role message — acceptable for current single-system-message usage; multi-system handling if needed by Epic 4 prompting strategy
+- DB pool startup failure silently swallowed — intentional resilience design; queries will raise `asyncpg` exceptions mid-request if pool never initialized; consider a startup health gate in production
+- `get_provider()` singleton not thread/concurrency-safe — safe for single-worker uvicorn; add a lock if moving to multi-worker or threaded execution
+- `asyncio.Lock` created at module scope in `ml-sidecar/src/db/pool.py` — pre-existing from story 1.2; raises deprecation warning in Python 3.10+ before running event loop
+- `/analyze/{ticker}` accepts any string with no length or format validation — intentional stub; add `Path(..., min_length=1, max_length=10, pattern=r'^[A-Z.]{1,10}$')` in Epic 6
+- `get_logger` re-evaluates `LOG_LEVEL` on every call — minor inconsistency for long-running processes; harmless for current usage
+- Test route mutation via `app.routes[:]` — existing working pattern; consider fixture-based route isolation in a future test quality story
+- `HTTPException` handler hardcodes `"HTTP_ERROR"` code — per-status codes (e.g. `"UNAUTHORIZED"`, `"FORBIDDEN"`) deferred to auth/rate-limit stories in Epic 5
+- `OpenAIProvider.complete` will `IndexError` on empty `choices` list — add a guard when real LLM calls land in Epic 4

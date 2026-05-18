@@ -76,4 +76,6 @@ def test_404_returns_standard_shape(client):
     response = client.get("/nonexistent-route-xyz-abc")
     assert response.status_code == 404
     data = response.json()
-    assert "detail" in data
+    assert isinstance(data.get("detail"), dict)
+    assert "code" in data["detail"]
+    assert "message" in data["detail"]

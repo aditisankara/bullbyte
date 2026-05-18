@@ -52,7 +52,7 @@ class AnthropicProvider(BaseLLMProvider):
         tool_calls: list[dict[str, Any]] = []
         for block in response.content:
             if block.type == "text":
-                content = block.text
+                content = (content or "") + block.text
             elif block.type == "tool_use":
                 tool_calls.append(
                     {
