@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.core.logging import get_logger
 from src.db.pool import close_pool, get_pool
@@ -29,8 +30,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="BullByte ML Sidecar", version="0.1.0", lifespan=lifespan)
 
 
+@app.exception_handler(StarletteHTTPException)
 @app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": {"code": "HTTP_ERROR", "message": exc.detail}},
