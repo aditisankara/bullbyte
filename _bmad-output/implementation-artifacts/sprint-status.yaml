@@ -49,7 +49,7 @@
 # that doesn't conflict with the other developer's active story.
 
 generated: "2026-05-01"
-last_updated: "2026-05-18"  # story 1.5 done
+last_updated: "2026-05-18"  # story 1.1 + 1.5 done
 project: bullbyte
 project_key: NOKEY
 tracking_system: file-system
@@ -64,7 +64,7 @@ development_status:
   epic-1: in-progress
 
   # Step 1 — do this first (one dev, unblocks everything)
-  1-1-docker-compose-stack-and-environment-configuration: review
+  1-1-docker-compose-stack-and-environment-configuration: done
 
   # Step 2 — parallelisable once 1.1 is done
   # Dev A track: DB schema + ML scaffold

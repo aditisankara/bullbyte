@@ -16,3 +16,12 @@
 - API URL normalization at startup (trailing slash validation) — beyond scaffold scope; address when first HTTP service is wired
 - No global `ErrorHandler` provided — cross-cutting observability concern; address in a future logging/monitoring story
 - Ticker case/encoding normalization (e.g. `aapl` vs `AAPL`) — route guard/resolver concern for Epic 6
+
+## Deferred from: code review of 1-1-docker-compose-stack-and-environment-configuration (2026-05-18)
+
+- Redis has no password configured — `redis:7-alpine` listens unauthenticated on host port 6379; add `requirepass` and update `REDIS_URL` before any public deployment
+- `ml-sidecar` container runs as root — no `USER` directive in Dockerfile; address in a production hardening story
+- `uv:latest` pinned by tag not digest — `COPY --from=ghcr.io/astral-sh/uv:latest` in ml-sidecar/Dockerfile will silently drift on rebuild; pin to specific semver digest before production
+- Hardcoded postgres password `postgres` in `docker-compose.yml` `environment:` block and `DATABASE_URL` — replace with a secret before deployment
+- nginx performance tuning absent — no `gzip`, `sendfile`, or cache headers; address in Epic 6 / production hardening
+- No graceful shutdown signal handling — NestJS `enableShutdownHooks()` not called; address in production hardening story
