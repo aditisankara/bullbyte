@@ -1,6 +1,6 @@
 # Story 1.3: FastAPI ML Sidecar Scaffold
 
-Status: review
+Status: done
 
 ## Story
 
@@ -63,6 +63,26 @@ So that the NestJS API can verify ML sidecar connectivity and the provider-agnos
   - [x] Create `tests/test_analyze.py` — 202 + stub payload + any ticker accepted
   - [x] Create `tests/test_llm_factory.py` — factory returns correct provider type per `LLM_PROVIDER`
   - [x] Create `tests/test_exception_handler.py` — HTTP exception shape + generic exception shape
+
+### Review Findings (AI) — 2026-05-18
+
+#### Patches
+- [x] [Review][Patch] `test_factory_raises_when_anthropic_key_missing` deletes wrong env var — confirmed already correct in file (`ANTHROPIC_API_KEY`); false positive from abbreviated diff — dismissed
+- [x] [Review][Patch] `AnthropicProvider.complete` overwrites `content` for each text block — fixed: `content = (content or "") + block.text` accumulates all text blocks [ml-sidecar/src/core/llm/anthropic_provider.py]
+- [x] [Review][Patch] OpenAI tool `arguments` returned as raw JSON string while Anthropic returns a parsed dict — fixed: `json.loads(tc.function.arguments)` normalizes to dict [ml-sidecar/src/core/llm/openai_provider.py]
+- [x] [Review][Patch] `_ServiceJsonFormatter` emits no `timestamp` field — fixed: `log_record["timestamp"] = log_record.pop("asctime", None) or self.formatTime(record)` [ml-sidecar/src/core/logging.py]
+- [x] [Review][Patch] `test_404_returns_standard_shape` assertion too weak — fixed: asserts `isinstance(data["detail"], dict)`, `"code" in data["detail"]`, `"message" in data["detail"]` [ml-sidecar/tests/test_exception_handler.py]
+
+#### Deferred
+- [x] [Review][Defer] `_split_system` silently keeps only the last system-role message — when multiple system messages appear, earlier ones are overwritten without warning; acceptable for current usage where callers send one system message — deferred, pre-existing design
+- [x] [Review][Defer] DB pool startup failure silently swallowed — lifespan catches and logs a warning then yields; subsequent queries that call `get_pool()` will raise unhandled `asyncpg` exceptions mid-request; intentional resilience design for scaffold — deferred, pre-existing
+- [x] [Review][Defer] `get_provider()` singleton not thread/concurrency-safe — no lock around `if _provider is None` check; safe for single-worker uvicorn but could create duplicate instances under concurrency — deferred, production hardening
+- [x] [Review][Defer] `asyncio.Lock` created at module scope in `pool.py` — pre-existing from story 1.2; raises deprecation warning in Python 3.10+ if instantiated before a running event loop — deferred, pre-existing
+- [x] [Review][Defer] `/analyze/{ticker}` accepts any string with no length or format validation — intentional stub; input validation comes with Epic 6 real implementation — deferred, pre-existing
+- [x] [Review][Defer] `get_logger` re-evaluates `LOG_LEVEL` on every call even for already-configured loggers — minor inconsistency in long-running processes; not a correctness issue for current usage — deferred, pre-existing
+- [x] [Review][Defer] Test route mutation via `app.routes[:]` could bleed state between test runs — existing working pattern; refactoring to avoid `app` mutation requires significant test restructure — deferred, pre-existing
+- [x] [Review][Defer] `HTTPException` handler hardcodes `"HTTP_ERROR"` code for all HTTP statuses — loses specificity for 401/403/429 etc.; per-status codes deferred to future auth/rate-limit stories — deferred, pre-existing design
+- [x] [Review][Defer] `OpenAIProvider.complete` will `IndexError` if API returns empty `choices` list — documented OpenAI edge case for filtered/truncated responses; generic exception handler catches it but opaquely — deferred, no real LLM calls in scaffold
 
 ## Dev Notes
 

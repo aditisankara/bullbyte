@@ -6,6 +6,7 @@ from `base.py` instead (NFR17).
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from openai import AsyncOpenAI
@@ -42,7 +43,7 @@ class OpenAIProvider(BaseLLMProvider):
                 {
                     "id": tc.id,
                     "name": tc.function.name,
-                    "arguments": tc.function.arguments,
+                    "arguments": json.loads(tc.function.arguments),
                 }
                 for tc in message.tool_calls
             ]

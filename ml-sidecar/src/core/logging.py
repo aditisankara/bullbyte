@@ -17,6 +17,7 @@ class _ServiceJsonFormatter(JsonFormatter):
         super().add_fields(log_record, record, message_dict)
         log_record["service"] = "ml-sidecar"
         log_record.setdefault("level", record.levelname.lower())
+        log_record["timestamp"] = log_record.pop("asctime", None) or self.formatTime(record)
         log_record.pop("levelname", None)
         log_record.pop("name", None)
 

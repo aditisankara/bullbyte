@@ -1,6 +1,6 @@
 # Story 1.1: Docker Compose Stack & Environment Configuration
 
-Status: review
+Status: done
 
 ## Story
 
@@ -286,6 +286,22 @@ claude-sonnet-4-6
 - Added `pytest` and `httpx` as `[dependency-groups] dev` in `pyproject.toml` and added `[tool.pytest.ini_options]` with `testpaths = ["tests"]` and `pythonpath = ["."]`.
 - Docker runtime connectivity test (api pinging ml-sidecar) requires a running Docker environment and is verified at `docker compose up` time, not in automated unit tests.
 - All 4 unit/integration tests pass: 2 NestJS (AppController) + 2 pytest (FastAPI health).
+
+### Review Findings (AI) — 2026-05-18
+
+#### Patches
+- [x] [Review][Patch] Install `curl` in all three app container images — `node:22-alpine`, `python:3.12-slim`, and `nginx:alpine` do not ship with curl; all three healthchecks (`curl -f http://localhost:...`) fail silently on first boot, preventing any service from becoming healthy [api/Dockerfile, ml-sidecar/Dockerfile, frontend/Dockerfile]
+- [x] [Review][Patch] Remove `env_file: .env` from the `db` service — postgres only needs `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` (already set inline via `environment:`); the `env_file` injects all LLM/EDGAR secrets into the postgres process environment unnecessarily [docker-compose.yml]
+- [x] [Review][Patch] Replace real API key prefix patterns in `.env.example` — `sk-ant-api03-...` and `sk-proj-...` match real Anthropic/OpenAI key formats and will trigger secret scanners (GitGuardian, trufflehog); use clearly fake placeholders like `your-anthropic-api-key-here` [.env.example]
+
+#### Deferred
+- [x] [Review][Defer] AC2 DB/Redis connection confirmation — story 1.1 intentionally defers actual connections: Postgres covered by story 1.4's `DrizzleModule`; Redis connection deferred to story 5.1 (BullMQ). Dev Notes explicitly state console.log in bootstrap is sufficient for 1.1. Accepted.
+- [x] [Review][Defer] Redis has no password configured — `redis:7-alpine` has no `requirepass` and listens on `0.0.0.0`; host port 6379 is mapped to host; acceptable for local dev but needs auth before any public deployment [docker-compose.yml]
+- [x] [Review][Defer] `ml-sidecar` container runs as root — no `USER` directive; low risk for local dev, address in production hardening story
+- [x] [Review][Defer] `uv:latest` pinned by tag not digest — `COPY --from=ghcr.io/astral-sh/uv:latest` will silently update on rebuild; pin to a specific semver digest before production [ml-sidecar/Dockerfile]
+- [x] [Review][Defer] Hardcoded postgres password `postgres` in `docker-compose.yml` and `DATABASE_URL` — acceptable for local dev; must be replaced with a secret before any deployment
+- [x] [Review][Defer] nginx performance tuning absent — no `gzip`, `sendfile`, or cache headers; deferred to Epic 6 / production hardening
+- [x] [Review][Defer] No graceful shutdown signal handling in NestJS — `enableShutdownHooks()` not called; deferred to story 1.4 / production hardening
 
 ### File List
 
