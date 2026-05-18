@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
 import { AllExceptionsFilter } from './all-exceptions.filter';
 
 function makeHost(responseMock: {
@@ -10,14 +10,14 @@ function makeHost(responseMock: {
 		switchToHttp: () => ({
 			getResponse: () => responseMock,
 		}),
-	} as any;
+	} as unknown as ArgumentsHost;
 }
 
 describe('AllExceptionsFilter', () => {
 	let filter: AllExceptionsFilter;
 	let status: jest.Mock;
 	let json: jest.Mock;
-	let host: any;
+	let host: ArgumentsHost;
 
 	beforeEach(() => {
 		filter = new AllExceptionsFilter();
@@ -66,7 +66,7 @@ describe('AllExceptionsFilter', () => {
 	it('returns 500 for generic Error without exposing message', () => {
 		filter.catch(new Error('internal details'), host);
 		expect(status).toHaveBeenCalledWith(500);
-		const call = json.mock.calls[0][0];
+		const [[call]] = json.mock.calls as [[Record<string, unknown>]];
 		expect(call.statusCode).toBe(500);
 		expect(call.error).toBe('INTERNAL_SERVER_ERROR');
 		expect(JSON.stringify(call)).not.toContain('internal details');
@@ -75,7 +75,7 @@ describe('AllExceptionsFilter', () => {
 
 	it('does not expose stack trace in response', () => {
 		filter.catch(new Error('secret'), host);
-		const call = json.mock.calls[0][0];
+		const [[call]] = json.mock.calls as [[Record<string, unknown>]];
 		expect(JSON.stringify(call)).not.toContain('secret');
 	});
 

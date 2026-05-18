@@ -21,16 +21,18 @@ export class MlSidecarService {
 	getHealth(): Observable<
 		AxiosResponse<{ status: string; service: string }>
 	> {
-		return this.httpService.get(`${this.baseUrl}/health`).pipe(
-			timeout(SIDECAR_TIMEOUT_MS),
-			catchError(() =>
-				throwError(
-					() =>
-						new ServiceUnavailableException(
-							'ML sidecar unavailable'
-						)
+		return this.httpService
+			.get<{ status: string; service: string }>(`${this.baseUrl}/health`)
+			.pipe(
+				timeout(SIDECAR_TIMEOUT_MS),
+				catchError(() =>
+					throwError(
+						() =>
+							new ServiceUnavailableException(
+								'ML sidecar unavailable'
+							)
+					)
 				)
-			)
-		);
+			);
 	}
 }

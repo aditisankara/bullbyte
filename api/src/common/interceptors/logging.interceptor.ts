@@ -12,6 +12,7 @@ import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
 import { Request } from 'express';
 
+// eslint-disable-next-line no-control-regex
 const CONTROL_CHARS_RE = /[\r\n\x00-\x1f\x7f]/g;
 
 @Injectable()

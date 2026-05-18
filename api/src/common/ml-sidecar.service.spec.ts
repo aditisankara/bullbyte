@@ -47,9 +47,11 @@ describe('MlSidecarService', () => {
 			throwError(() => new Error('connection refused'))
 		);
 		service.getHealth().subscribe({
-			error: (err) => {
+			error: (err: unknown) => {
 				expect(err).toBeInstanceOf(ServiceUnavailableException);
-				expect(err.getStatus()).toBe(503);
+				expect((err as ServiceUnavailableException).getStatus()).toBe(
+					503
+				);
 				done();
 			},
 		});

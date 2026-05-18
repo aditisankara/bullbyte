@@ -6,11 +6,22 @@ import {
 	HttpStatus,
 } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
+import { Logger } from 'winston';
+
+type MockLogger = { info: jest.Mock; warn: jest.Mock };
+
+function makeLogger(): MockLogger {
+	return { info: jest.fn(), warn: jest.fn() };
+}
+
+function makeInterceptor(logger: MockLogger): LoggingInterceptor {
+	return new LoggingInterceptor(logger as unknown as Logger);
+}
 
 describe('LoggingInterceptor', () => {
 	it('calls logger.info with method, path, and message', () => {
-		const mockLogger = { info: jest.fn(), warn: jest.fn() } as any;
-		const interceptor = new LoggingInterceptor(mockLogger);
+		const mockLogger = makeLogger();
+		const interceptor = makeInterceptor(mockLogger);
 
 		const context = {
 			switchToHttp: () => ({
@@ -29,8 +40,8 @@ describe('LoggingInterceptor', () => {
 	});
 
 	it('returns the observable from next.handle()', (done) => {
-		const mockLogger = { info: jest.fn(), warn: jest.fn() } as any;
-		const interceptor = new LoggingInterceptor(mockLogger);
+		const mockLogger = makeLogger();
+		const interceptor = makeInterceptor(mockLogger);
 
 		const context = {
 			switchToHttp: () => ({
@@ -46,8 +57,8 @@ describe('LoggingInterceptor', () => {
 	});
 
 	it('strips control characters from path before logging', () => {
-		const mockLogger = { info: jest.fn(), warn: jest.fn() } as any;
-		const interceptor = new LoggingInterceptor(mockLogger);
+		const mockLogger = makeLogger();
+		const interceptor = makeInterceptor(mockLogger);
 
 		const context = {
 			switchToHttp: () => ({
@@ -61,14 +72,16 @@ describe('LoggingInterceptor', () => {
 		const next: CallHandler = { handle: () => of(null) };
 		interceptor.intercept(context, next).subscribe();
 
-		const logged = mockLogger.info.mock.calls[0][0];
+		const [[logged]] = mockLogger.info.mock.calls as [
+			[Record<string, unknown>],
+		];
 		expect(logged.path).not.toMatch(/[\r\n]/);
 		expect(logged.path).toBe('/api/v1/healthX-Injected: evil');
 	});
 
 	it('logs warn with statusCode on error response', (done) => {
-		const mockLogger = { info: jest.fn(), warn: jest.fn() } as any;
-		const interceptor = new LoggingInterceptor(mockLogger);
+		const mockLogger = makeLogger();
+		const interceptor = makeInterceptor(mockLogger);
 
 		const context = {
 			switchToHttp: () => ({
