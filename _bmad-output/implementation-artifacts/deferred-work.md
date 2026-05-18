@@ -37,3 +37,12 @@
 - Test route mutation via `app.routes[:]` — existing working pattern; consider fixture-based route isolation in a future test quality story
 - `HTTPException` handler hardcodes `"HTTP_ERROR"` code — per-status codes (e.g. `"UNAUTHORIZED"`, `"FORBIDDEN"`) deferred to auth/rate-limit stories in Epic 5
 - `OpenAIProvider.complete` will `IndexError` on empty `choices` list — add a guard when real LLM calls land in Epic 4
+
+## Deferred from: code review of 1-6-github-actions-ci-cd-pipeline (2026-05-18)
+
+- `npm run lint` in `api-checks` uses `--fix` — auto-fixable ESLint violations pass CI silently; fix by adding a separate `lint:ci` script in `api/package.json` that omits `--fix`
+- No uv dependency cache for `ml-sidecar-checks` — all Python packages re-downloaded on each run; add `enable-cache: true` to `astral-sh/setup-uv@v5` in a future CI improvement story
+- `ml-sidecar` docker build may bundle `.venv/` into the image — add a `.dockerignore` in `ml-sidecar/` to exclude `.venv/`, `__pycache__`, and `*.pyc`
+- `tsc --noEmit -p tsconfig.json` in `api-checks` excludes test files — type errors in `*.spec.ts` are invisible to CI; address by adding a separate `tsc -p tsconfig.json` step that includes test files, or updating tsconfig
+- Direct push to `main` bypasses all PR quality gates — enforce branch protection rules (require PRs, require status checks) in GitHub repo settings
+- `packageManager: npm@10.9.7` in `frontend/package.json` may conflict with Node 22 bundled npm if corepack is active on CI runners; pin npm version explicitly or remove the `packageManager` field
