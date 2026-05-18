@@ -1,0 +1,16 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+main {
+  flex: 1;
+}
+
+footer {
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #666;
+}

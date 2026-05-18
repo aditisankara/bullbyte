@@ -4,3 +4,15 @@
 
 - Missing FK indexes on `analysis_jobs.company_id`, `verdicts.claim_id`, `reasoning_traces.verdict_id`, `tool_call_logs.job_id` — only `idx_claims_company_id` required by current spec; add remaining FK indexes in a future performance story
 - `analysisJobs` table has no status transition timestamps (`started_at`, `finished_at`) — out of scope for Phase 1 append-only model; useful for debugging stuck jobs but not required until a job monitoring story lands
+
+## Deferred from: code review of 1-5-angular-spa-scaffold-and-routing-shell (2026-05-18)
+
+- All 4xx HTTP errors produce identical message — no 401/403/429 distinction; needs per-status handling in future auth/rate-limit stories
+- `ApiError` discards original `HttpErrorResponse` — url, method, and body are lost; may be needed by future diagnostic/logging stories
+- `environment.ts` not yet imported by any service — intentional scaffold; future HTTP service stories (Epic 5/6) will consume it
+- `CompanyComponent` doesn't read `:ticker` route param — placeholder stub; Epic 6 stories will implement data fetching
+- `<main>` has no ARIA `role` or skip-navigation link — accessibility deferred to Epic 2 design system stories
+- Empty `:ticker` (`/company/`) and lazy-chunk-load failure after wildcard redirect lack route guards — feature-layer concern for Epic 6 stories
+- API URL normalization at startup (trailing slash validation) — beyond scaffold scope; address when first HTTP service is wired
+- No global `ErrorHandler` provided — cross-cutting observability concern; address in a future logging/monitoring story
+- Ticker case/encoding normalization (e.g. `aapl` vs `AAPL`) — route guard/resolver concern for Epic 6
