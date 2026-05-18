@@ -12,7 +12,6 @@
 		"target": "ES2023",
 		"sourceMap": true,
 		"outDir": "./dist",
-		"rootDir": "./src",
 		"tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo",
 		"incremental": true,
 		"skipLibCheck": true,
@@ -23,5 +22,5 @@
 		"noFallthroughCasesInSwitch": false,
 		"types": ["jest", "node"]
 	},
-	"include": ["src/**/*"]
+	"include": ["src/**/*", "test/**/*"]
 }

@@ -15,34 +15,37 @@ import { CustomThrottlerGuard } from './common/guards/throttler.guard';
 import { MlSidecarService } from './common/ml-sidecar.service';
 
 @Module({
-  imports: [
-    ConfigModule.forRoot({ isGlobal: true, validationSchema: appValidationSchema }),
-    WinstonModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: createWinstonConfig,
-    }),
-    ThrottlerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => [
-        {
-          ttl: config.getOrThrow<number>('THROTTLE_TTL') * 1000,
-          limit: config.getOrThrow<number>('THROTTLE_LIMIT'),
-        },
-      ],
-    }),
-    HttpModule,
-    DrizzleModule,
-  ],
-  controllers: [AppController],
-  providers: [
-    AppService,
-    MlSidecarService,
-    { provide: APP_FILTER, useClass: AllExceptionsFilter },
-    { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
-    { provide: APP_GUARD, useClass: CustomThrottlerGuard },
-  ],
-  exports: [MlSidecarService],
+	imports: [
+		ConfigModule.forRoot({
+			isGlobal: true,
+			validationSchema: appValidationSchema,
+		}),
+		WinstonModule.forRootAsync({
+			imports: [ConfigModule],
+			inject: [ConfigService],
+			useFactory: createWinstonConfig,
+		}),
+		ThrottlerModule.forRootAsync({
+			imports: [ConfigModule],
+			inject: [ConfigService],
+			useFactory: (config: ConfigService) => [
+				{
+					ttl: config.getOrThrow<number>('THROTTLE_TTL') * 1000,
+					limit: config.getOrThrow<number>('THROTTLE_LIMIT'),
+				},
+			],
+		}),
+		HttpModule,
+		DrizzleModule,
+	],
+	controllers: [AppController],
+	providers: [
+		AppService,
+		MlSidecarService,
+		{ provide: APP_FILTER, useClass: AllExceptionsFilter },
+		{ provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+		{ provide: APP_GUARD, useClass: CustomThrottlerGuard },
+	],
+	exports: [MlSidecarService],
 })
 export class AppModule {}
