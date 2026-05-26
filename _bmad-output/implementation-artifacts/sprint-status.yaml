@@ -49,7 +49,7 @@
 # that doesn't conflict with the other developer's active story.
 
 generated: "2026-05-01"
-last_updated: "2026-05-18"  # story 1.1 + 1.3 + 1.5 + 1.6 done; Epic 1 complete
+last_updated: "2026-05-19"  # story 1.1 + 1.3 + 1.5 + 1.6 done; Epic 1 complete; 3.1 done
 project: bullbyte
 project_key: NOKEY
 tracking_system: file-system
@@ -100,9 +100,9 @@ development_status:
   # PRIORITY: Start after Epic 1. Runs fully in parallel with Epic 5.
   # Unblocks Epic 4.
   # ─────────────────────────────────────────────────────────────
-  epic-3: backlog
+  epic-3: in-progress
 
-  3-1-edgar-http-client-with-rate-limiting-queue: backlog     # needs 1.3
+  3-1-edgar-http-client-with-rate-limiting-queue: done        # needs 1.3
   3-2-8-k-earnings-call-transcript-ingestion-and-parsing: backlog  # needs 3.1
   3-3-10-q-10-k-financial-actuals-ingestion-and-parsing: backlog   # needs 3.1; parallel with 3.2
   3-4-temporal-alignment-engine: backlog              # needs 3.2 + 3.3

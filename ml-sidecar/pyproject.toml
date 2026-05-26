@@ -8,18 +8,21 @@ dependencies = [
     "anthropic>=0.100.0",
     "asyncpg>=0.30.0",
     "fastapi>=0.136.1",
+    "httpx>=0.28.1",
     "openai>=2.36.0",
     "pydantic>=2.13.3",
     "python-json-logger>=4.1.0",
+    "tenacity>=9.0.0",
     "uvicorn>=0.46.0",
 ]
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "pytest>=9.0.3",
+    "pytest-asyncio>=0.24.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+asyncio_mode = "auto"
