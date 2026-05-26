@@ -1,6 +1,6 @@
 # Story 3.2: 8-K Earnings Call Transcript Ingestion & Parsing
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -31,73 +31,105 @@ So that the extraction pipeline has structured transcript text for every support
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add new dependencies to pyproject.toml (AC: 1, 2)
-  - [ ] Add `beautifulsoup4>=4.13.0` to `[project] dependencies` via `uv add beautifulsoup4`
-  - [ ] Add `lxml>=5.0.0` to `[project] dependencies` via `uv add lxml`
-  - [ ] Run `uv sync` to update `uv.lock`
+- [x] Task 1: Add new dependencies to pyproject.toml (AC: 1, 2)
+  - [x] Add `beautifulsoup4>=4.13.0` to `[project] dependencies` via `uv add beautifulsoup4`
+  - [x] Add `lxml>=5.0.0` to `[project] dependencies` via `uv add lxml`
+  - [x] Run `uv sync` to update `uv.lock`
 
-- [ ] Task 2: Create `src/models/__init__.py` and `src/models/ingestion_models.py` (AC: 2)
-  - [ ] Create `src/models/` directory with empty `__init__.py`
-  - [ ] Define `ParseStatus` as a `Literal` type: `Literal["SUCCESS", "PARSE_FAILURE", "NO_TRANSCRIPT", "FETCH_ERROR"]`
-  - [ ] Define `TranscriptResult` Pydantic model with fields: `ticker: str`, `quarter: str`, `filing_date: str`, `raw_text: str`, `filing_url: str`, `parse_status: ParseStatus`
-  - [ ] Define `IngestionSummary` Pydantic model with fields: `ticker: str`, `date_range_start: str`, `date_range_end: str`, `total_8k_found: int`, `transcripts_extracted: int`, `skipped_no_transcript: int`, `parse_failures: int`, `results: list[TranscriptResult]`
+- [x] Task 2: Create `src/models/__init__.py` and `src/models/ingestion_models.py` (AC: 2)
+  - [x] Create `src/models/` directory with empty `__init__.py`
+  - [x] Define `ParseStatus` as a `Literal` type: `Literal["SUCCESS", "PARSE_FAILURE", "NO_TRANSCRIPT", "FETCH_ERROR"]`
+  - [x] Define `TranscriptResult` Pydantic model with fields: `ticker: str`, `quarter: str`, `filing_date: str`, `raw_text: str`, `filing_url: str`, `parse_status: ParseStatus`
+  - [x] Define `IngestionSummary` Pydantic model with fields: `ticker: str`, `date_range_start: str`, `date_range_end: str`, `total_8k_found: int`, `transcripts_extracted: int`, `skipped_no_transcript: int`, `parse_failures: int`, `results: list[TranscriptResult]`
 
-- [ ] Task 3: Implement ticker-to-CIK resolution in `src/services/ingestion_service.py` (AC: 1)
-  - [ ] Fetch `https://www.sec.gov/files/company_tickers.json` via `get_client().fetch(url, ticker="system", filing_type="tickers")`
-  - [ ] Parse response JSON to build `{ TICKER_UPPER: cik_zero_padded_10_digits }` dict (e.g. `"TSLA": "0001318605"`)
-  - [ ] Cache the mapping as a module-level dict `_TICKER_CIK_MAP`; refresh only on startup (never re-fetch per request)
-  - [ ] Raise `ValueError(f"Ticker {ticker!r} not found in EDGAR company index")` if ticker not in map
+- [x] Task 3: Implement ticker-to-CIK resolution in `src/services/ingestion_service.py` (AC: 1)
+  - [x] Fetch `https://www.sec.gov/files/company_tickers.json` via `get_client().fetch(url, ticker="system", filing_type="tickers")`
+  - [x] Parse response JSON to build `{ TICKER_UPPER: cik_zero_padded_10_digits }` dict (e.g. `"TSLA": "0001318605"`)
+  - [x] Cache the mapping as a module-level dict `_TICKER_CIK_MAP`; refresh only on startup (never re-fetch per request)
+  - [x] Raise `ValueError(f"Ticker {ticker!r} not found in EDGAR company index")` if ticker not in map
 
-- [ ] Task 4: Implement EDGAR 8-K filing discovery — `_get_8k_filings(cik, start_date, end_date)` (AC: 1)
-  - [ ] Fetch submissions: `https://data.sec.gov/submissions/CIK{cik}.json` via `get_client().fetch()`
-  - [ ] Zip parallel arrays `accessionNumber`, `filingDate`, `form` from `filings.recent` into per-filing dicts
-  - [ ] Filter: `form == "8-K"` and `start_date <= filingDate <= end_date` (ISO string comparison)
-  - [ ] Handle large filers: if `filings.files` is non-empty, fetch each additional page from `https://data.sec.gov/submissions/{filename}` and append its `filings.recent` entries
-  - [ ] Return `list[dict]` of `{ accession_no: str, filing_date: str }` sorted by `filing_date` ascending
+- [x] Task 4: Implement EDGAR 8-K filing discovery — `_get_8k_filings(cik, start_date, end_date)` (AC: 1)
+  - [x] Fetch submissions: `https://data.sec.gov/submissions/CIK{cik}.json` via `get_client().fetch()`
+  - [x] Zip parallel arrays `accessionNumber`, `filingDate`, `form` from `filings.recent` into per-filing dicts
+  - [x] Filter: `form == "8-K"` and `start_date <= filingDate <= end_date` (ISO string comparison)
+  - [x] Handle large filers: if `filings.files` is non-empty, fetch each additional page from `https://data.sec.gov/submissions/{filename}` and append its `filings.recent` entries
+  - [x] Return `list[dict]` of `{ accession_no: str, filing_date: str }` sorted by `filing_date` ascending
 
-- [ ] Task 5: Implement filing index fetch — `_get_exhibit_documents(cik, accession_no)` (AC: 1, 2)
-  - [ ] Derive URL: accession_no without dashes for path, e.g. `"0001318605-24-000123"` → path `"000131860524000123"`, index URL `https://www.sec.gov/Archives/edgar/data/{cik}/{path}/{accession_no}-index.htm`
-  - [ ] Fetch index via `get_client().fetch()`
-  - [ ] Parse HTML with BeautifulSoup; extract document table rows as `{ type: str, description: str, document: str }` where `document` is the filename
-  - [ ] Construct full document URL: `https://www.sec.gov/Archives/edgar/data/{cik}/{path}/{document}`
-  - [ ] Return only rows where `type` starts with `"EX-99"` or `description` contains `"transcript"` (case-insensitive); return empty list if none
+- [x] Task 5: Implement filing index fetch — `_get_exhibit_documents(cik, accession_no)` (AC: 1, 2)
+  - [x] Derive URL: accession_no without dashes for path, e.g. `"0001318605-24-000123"` → path `"000131860524000123"`, index URL `https://www.sec.gov/Archives/edgar/data/{cik}/{path}/{accession_no}-index.htm`
+  - [x] Fetch index via `get_client().fetch()`
+  - [x] Parse HTML with BeautifulSoup; extract document table rows as `{ type: str, description: str, document: str }` where `document` is the filename
+  - [x] Construct full document URL: `https://www.sec.gov/Archives/edgar/data/{cik}/{path}/{document}`
+  - [x] Return only rows where `type` starts with `"EX-99"` or `description` contains `"transcript"` (case-insensitive); return empty list if none
 
-- [ ] Task 6: Implement transcript text extraction — `_extract_transcript_text(url, ticker, filing_date)` (AC: 2, 3)
-  - [ ] Fetch document via `get_client().fetch(url, ticker=ticker, filing_type="8-K-exhibit")`
-  - [ ] Score keyword hits in the first 8,000 characters of response text (case-insensitive): `"operator"`, `"conference call"`, `"earnings call"`, `"q&a"`, `"fiscal quarter"`, `"per share"`, `"revenue"` — count unique keyword matches
-  - [ ] If keyword score < 3: return `None` (caller marks as `NO_TRANSCRIPT`)
-  - [ ] Parse full response content with `BeautifulSoup(content, "lxml").get_text(separator="\n", strip=True)`; collapse runs of 3+ blank lines to 2 blank lines
-  - [ ] Wrap in `try/except Exception`; on any exception log at `error` level and return `None` with a `PARSE_FAILURE` indicator
+- [x] Task 6: Implement transcript text extraction — `_extract_transcript_text(url, ticker, filing_date)` (AC: 2, 3)
+  - [x] Fetch document via `get_client().fetch(url, ticker=ticker, filing_type="8-K-exhibit")`
+  - [x] Score keyword hits in the first 8,000 characters of response text (case-insensitive): `"operator"`, `"conference call"`, `"earnings call"`, `"q&a"`, `"fiscal quarter"`, `"per share"`, `"revenue"` — count unique keyword matches
+  - [x] If keyword score < 3: return `None` (caller marks as `NO_TRANSCRIPT`)
+  - [x] Parse full response content with `BeautifulSoup(content, "lxml").get_text(separator="\n", strip=True)`; collapse runs of 3+ blank lines to 2 blank lines
+  - [x] Wrap in `try/except Exception`; on any exception log at `error` level and return `None` with a `PARSE_FAILURE` indicator
 
-- [ ] Task 7: Implement quarter mapping — `_filing_date_to_quarter(filing_date)` (AC: 2)
-  - [ ] Map `filing_date` (ISO string `"YYYY-MM-DD"`) to earnings quarter:
+- [x] Task 7: Implement quarter mapping — `_filing_date_to_quarter(filing_date)` (AC: 2)
+  - [x] Map `filing_date` (ISO string `"YYYY-MM-DD"`) to earnings quarter:
     - Month 1–3 → `f"Q4-{year-1}"`
     - Month 4–6 → `f"Q1-{year}"`
     - Month 7–9 → `f"Q2-{year}"`
     - Month 10–12 → `f"Q3-{year}"`
-  - [ ] Return in canonical format `"Q{n}-{YYYY}"` — never any other representation (architecture canonical enum)
-  - [ ] Implement as a pure module-level function (independently unit-testable)
+  - [x] Return in canonical format `"Q{n}-{YYYY}"` — never any other representation (architecture canonical enum)
+  - [x] Implement as a pure module-level function (independently unit-testable)
 
-- [ ] Task 8: Assemble top-level `ingest_8k_transcripts(ticker, start_date, end_date)` (AC: 1–4)
-  - [ ] Orchestrate: CIK lookup → `_get_8k_filings()` → for each filing: `_get_exhibit_documents()` → for each exhibit: `_extract_transcript_text()`
-  - [ ] Map results to `TranscriptResult` objects with correct `parse_status` (`"SUCCESS"`, `"NO_TRANSCRIPT"`, `"PARSE_FAILURE"`, `"FETCH_ERROR"`)
-  - [ ] Catch `EdgarFetchError` from any fetch call: set `parse_status: "FETCH_ERROR"`, log, continue — never propagate
-  - [ ] Return `IngestionSummary` with full `results` list and accurate counts
-  - [ ] Log completion with structured entry: `ticker`, `total_8k_found`, `transcripts_extracted`, `skipped_no_transcript`, `parse_failures`
-  - [ ] All EDGAR HTTP calls go through `get_client().fetch()` — no direct `httpx` calls in this file
+- [x] Task 8: Assemble top-level `ingest_8k_transcripts(ticker, start_date, end_date)` (AC: 1–4)
+  - [x] Orchestrate: CIK lookup → `_get_8k_filings()` → for each filing: `_get_exhibit_documents()` → for each exhibit: `_extract_transcript_text()`
+  - [x] Map results to `TranscriptResult` objects with correct `parse_status` (`"SUCCESS"`, `"NO_TRANSCRIPT"`, `"PARSE_FAILURE"`, `"FETCH_ERROR"`)
+  - [x] Catch `EdgarFetchError` from any fetch call: set `parse_status: "FETCH_ERROR"`, log, continue — never propagate
+  - [x] Return `IngestionSummary` with full `results` list and accurate counts
+  - [x] Log completion with structured entry: `ticker`, `total_8k_found`, `transcripts_extracted`, `skipped_no_transcript`, `parse_failures`
+  - [x] All EDGAR HTTP calls go through `get_client().fetch()` — no direct `httpx` calls in this file
 
-- [ ] Task 9: Write tests `tests/test_ingestion.py` (AC: 1–4)
-  - [ ] Test: `_load_ticker_cik_map()` returns correct zero-padded CIK for `"TSLA"` (mock response JSON)
-  - [ ] Test: unknown ticker raises `ValueError` with message containing the ticker symbol
-  - [ ] Test: `_get_8k_filings()` filters correctly — returns only 8-K within date range, excludes 8-K/A and out-of-range dates (mock submissions JSON)
-  - [ ] Test: `_get_8k_filings()` handles large filer pagination — fetches additional file and appends results (mock two submissions pages)
-  - [ ] Test: `_get_exhibit_documents()` parses filing index HTML and returns EX-99 documents with full URLs
-  - [ ] Test: `_extract_transcript_text()` returns `None` when keyword score < 3 (non-transcript 8-K)
-  - [ ] Test: `_extract_transcript_text()` returns cleaned text when keyword score ≥ 3
-  - [ ] Test: `_extract_transcript_text()` on malformed HTML raises no exception — returns `None` indicating parse failure
-  - [ ] Test: `_filing_date_to_quarter()` correct for all 12 months across year boundary (parameterized: Jan 2024 → Q4-2023, Apr 2024 → Q1-2024, etc.)
-  - [ ] Test: `ingest_8k_transcripts()` returns `IngestionSummary` with correct counts when mix of SUCCESS / NO_TRANSCRIPT / FETCH_ERROR results
-  - [ ] Test: `EdgarFetchError` on one filing does not halt processing — remaining filings continue and appear in results
+- [x] Task 9: Write tests `tests/test_ingestion.py` (AC: 1–4)
+  - [x] Test: `_load_ticker_cik_map()` returns correct zero-padded CIK for `"TSLA"` (mock response JSON)
+  - [x] Test: unknown ticker raises `ValueError` with message containing the ticker symbol
+  - [x] Test: `_get_8k_filings()` filters correctly — returns only 8-K within date range, excludes 8-K/A and out-of-range dates (mock submissions JSON)
+  - [x] Test: `_get_8k_filings()` handles large filer pagination — fetches additional file and appends results (mock two submissions pages)
+  - [x] Test: `_get_exhibit_documents()` parses filing index HTML and returns EX-99 documents with full URLs
+  - [x] Test: `_extract_transcript_text()` returns `None` when keyword score < 3 (non-transcript 8-K)
+  - [x] Test: `_extract_transcript_text()` returns cleaned text when keyword score ≥ 3
+  - [x] Test: `_extract_transcript_text()` on malformed HTML raises no exception — returns `None` indicating parse failure
+  - [x] Test: `_filing_date_to_quarter()` correct for all 12 months across year boundary (parameterized: Jan 2024 → Q4-2023, Apr 2024 → Q1-2024, etc.)
+  - [x] Test: `ingest_8k_transcripts()` returns `IngestionSummary` with correct counts when mix of SUCCESS / NO_TRANSCRIPT / FETCH_ERROR results
+  - [x] Test: `EdgarFetchError` on one filing does not halt processing — remaining filings continue and appear in results
+
+### Review Findings (AI) — 2026-05-26
+
+#### Decision Needed
+
+- [x] [Review][Decision] `raw_text` typed `str` vs `Optional[str]` — resolved: keep `str`; empty string is the sentinel for non-SUCCESS rows (Option B) [ingestion_models.py]
+- [x] [Review][Decision] `IngestionSummary` missing `fetch_errors` counter — resolved: add `fetch_errors: int` field (Option A) [ingestion_models.py]
+
+#### Patches
+
+- [x] [Review][Patch] PARSE_FAILURE never propagated to `best_status` — exhibit loop only assigns `best_status` on SUCCESS or EdgarFetchError; `(None, "PARSE_FAILURE")` return from `_extract_transcript_text` falls through silently; `parse_failures` counter is unreachable code [ingestion_service.py:236-240]
+- [x] [Review][Patch] `_extract_transcript_text` docstring says "never raises" but re-raises `EdgarFetchError` — misleads future callers into omitting the required catch [ingestion_service.py:129]
+- [x] [Review][Patch] asyncio race in `_load_ticker_cik_map` — two concurrent coroutines both see empty dict, both fetch `company_tickers.json`; add `asyncio.Lock` guard [ingestion_service.py:35-46]
+- [x] [Review][Patch] FETCH_ERROR `filing_url` uses raw `accession_no` not `accession_path` — stored URL is invalid (dashes not stripped) [ingestion_service.py:207]
+- [x] [Review][Patch] `zip()` silently truncates if EDGAR returns mismatched-length arrays — add len-check log warning [ingestion_service.py:83-87]
+- [x] [Review][Patch] Malformed `filing_date` from EDGAR crashes `_filing_date_to_quarter` uncaught — `strptime` raises `ValueError` which propagates out of the orchestrator loop [ingestion_service.py:193]
+- [x] [Review][Patch] Missing `'name'` key in `file_meta` raises `KeyError` — use `file_meta.get('name')` with guard and log skip [ingestion_service.py:70-74]
+- [x] [Review][Patch] Keyword uniqueness uses list iteration not a set — `sum(1 for kw in list if kw in preview)` double-counts if list ever has duplicates; use `len({kw for kw in ... if kw in preview})` [ingestion_service.py:133]
+- [x] [Review][Patch] `IngestionSummary` has empty docstring `""""""` [ingestion_models.py:18]
+- [x] [Review][Patch] No test for PARSE_FAILURE path through orchestrator — `parse_failures` counter increment is unreachable; add test mocking `_extract_transcript_text` to return `(None, "PARSE_FAILURE")` [tests/test_ingestion.py]
+- [x] [Review][Patch] href with query string corrupts exhibit URL — `link.get("href","").split("/")[-1]` keeps `?v=2` suffix; strip at `?` [ingestion_service.py:111-112]
+
+#### Deferred
+
+- [x] [Review][Defer] 8000-char preamble may miss keywords in markup-heavy files [ingestion_service.py:132] — deferred, spec-mandated threshold (Task 6)
+- [x] [Review][Defer] No deduplication across `recent` and paginated `files` blocks [ingestion_service.py:67-74] — deferred, EDGAR pagination is non-overlapping by design
+- [x] [Review][Defer] Filing index table column order assumed stable [ingestion_service.py:107] — deferred, EDGAR HTML has been stable for years
+- [x] [Review][Defer] `best_url` tracks last error URL, not most informative URL [ingestion_service.py:222-223] — deferred, minor logging inaccuracy
+- [x] [Review][Defer] `ParseStatus` as `Literal` not `StrEnum` [ingestion_models.py:7] — deferred, Pydantic validates correctly; StrEnum migration is beyond story scope
+- [x] [Review][Defer] `lxml` parser corrupts plain-text `.txt` filings with `<>` characters [ingestion_service.py:136] — deferred, spec mandates lxml; .txt filing support is future work
+- [x] [Review][Defer] No test for concurrent `_load_ticker_cik_map` race [tests/test_ingestion.py] — deferred, asyncio concurrency is reliably untestable without additional infrastructure
+- [x] [Review][Defer] No test for empty submissions JSON response [tests/test_ingestion.py] — deferred, graceful fallback confirmed in code
 
 ## Dev Notes
 
@@ -329,10 +361,30 @@ svc._TICKER_CIK_MAP = {}  # reset cache
 
 ### Agent Model Used
 
+claude-sonnet-4-6
+
 ### Debug Log References
+
+- One test failure fixed: `test_ingest_8k_transcripts_returns_summary_with_correct_counts` — mock `side_effect` was missing a response for filing 2's second EX-99 exhibit; the orchestrator loops through all exhibits before giving up, so both ex991 and ex992 were fetched when neither scored ≥3 keywords.
 
 ### Completion Notes List
 
+- Tasks 1–2 were partially done by developer before handoff; Task 2 had a typo (`resutls` → `results`) that was corrected.
+- `ingestion_service.py` rewritten from scratch — original sketch was synchronous, lacked `_TICKER_CIK_MAP` cache, zero-padding, `ValueError`, and logging.
+- `_extract_transcript_text` re-raises `EdgarFetchError` so the orchestrator can set `FETCH_ERROR` status; only unexpected exceptions are swallowed with `PARSE_FAILURE`.
+- `_filing_date_to_quarter` implemented as pure module-level function — independently testable with no fixtures needed.
+- 22 new tests, 51 total passing, 0 regressions.
+
 ### File List
 
+- ml-sidecar/pyproject.toml (modified — added beautifulsoup4, lxml)
+- ml-sidecar/uv.lock (modified — uv sync)
+- ml-sidecar/src/models/__init__.py (new)
+- ml-sidecar/src/models/ingestion_models.py (new)
+- ml-sidecar/src/services/ingestion_service.py (new)
+- ml-sidecar/tests/test_ingestion.py (new)
+- ml-sidecar/src/core/edgar_client.py (modified — module/class/method docstrings added)
+
 ## Change Log
+
+- 2026-05-26: Story 3.2 implemented — 8-K transcript ingestion pipeline (Tasks 1–9), 22 tests, 51/51 suite passing.
