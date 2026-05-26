@@ -45,9 +45,10 @@ export class MlSidecarService {
 		ticker: string
 	): Observable<AxiosResponse<{ jobId: string; status: string }>> {
 		return this.httpService
-			.post<{ jobId: string; status: string }>(
-				`${this.baseUrl}/analyze/${ticker}`
-			)
+			.post<{
+				jobId: string;
+				status: string;
+			}>(`${this.baseUrl}/analyze/${ticker}`)
 			.pipe(
 				timeout(SIDECAR_TIMEOUT_MS),
 				catchError(() =>

@@ -1,8 +1,4 @@
-import {
-	BadRequestException,
-	Injectable,
-	PipeTransform,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
 
 const TICKER_PATTERN = /^[A-Z.]{1,10}$/;
 

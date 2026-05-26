@@ -1,14 +1,11 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Inject, LoggerService } from '@nestjs/common';
+import { Inject } from '@nestjs/common';
+import type { LoggerService } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Job } from 'bullmq';
 import { firstValueFrom } from 'rxjs';
 import { MlSidecarService } from '../common/ml-sidecar.service';
-import {
-	ANALYSIS_QUEUE,
-	AnalysisJobData,
-	JobsService,
-} from './jobs.service';
+import { ANALYSIS_QUEUE, AnalysisJobData, JobsService } from './jobs.service';
 
 @Processor(ANALYSIS_QUEUE)
 export class AnalysisProcessor extends WorkerHost {

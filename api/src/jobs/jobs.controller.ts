@@ -1,5 +1,5 @@
 import { Controller, HttpStatus, Param, Post, Res } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { JobsService } from './jobs.service';
 import { AnalyzeResponseDto } from './dto/analyze-response.dto';
 import { TickerValidationPipe } from './ticker-validation.pipe';
@@ -20,9 +20,7 @@ export class JobsController {
 	): Promise<AnalyzeResponseDto> {
 		const result = await this.jobsService.requestAnalysis(ticker);
 		res.status(
-			result.status === 'COMPLETED'
-				? HttpStatus.OK
-				: HttpStatus.ACCEPTED
+			result.status === 'COMPLETED' ? HttpStatus.OK : HttpStatus.ACCEPTED
 		);
 		return result;
 	}

@@ -2,7 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { desc, eq } from 'drizzle-orm';
-import { DRIZZLE, DrizzleDB } from '../db/drizzle.module';
+import { DRIZZLE } from '../db/drizzle.module';
+import type { DrizzleDB } from '../db/drizzle.module';
 import { analysisJobs, companies } from '../db/schema';
 import { AnalyzeResponseDto, JobStatus } from './dto/analyze-response.dto';
 
