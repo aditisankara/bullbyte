@@ -46,3 +46,9 @@
 - `tsc --noEmit -p tsconfig.json` in `api-checks` excludes test files — type errors in `*.spec.ts` are invisible to CI; address by adding a separate `tsc -p tsconfig.json` step that includes test files, or updating tsconfig
 - Direct push to `main` bypasses all PR quality gates — enforce branch protection rules (require PRs, require status checks) in GitHub repo settings
 - `packageManager: npm@10.9.7` in `frontend/package.json` may conflict with Node 22 bundled npm if corepack is active on CI runners; pin npm version explicitly or remove the `packageManager` field
+
+## Deferred from: code review of 3-1-edgar-http-client-with-rate-limiting-queue (2026-05-19)
+
+- `_retrying` tenacity wrapper is recreated on every `_do_fetch` call — minor allocation waste; refactor to a class-level or module-level constant when optimizing the hot path
+- `EdgarFetchLog` Pydantic model is defined but never used in the logging path — spec requires its definition; wire it to enforce the log schema in a future observability story
+- No production shutdown hook for `await client._http_client.aclose()` on FastAPI app teardown — requires touching `src/main.py`; address in a production hardening story alongside other lifecycle hooks
