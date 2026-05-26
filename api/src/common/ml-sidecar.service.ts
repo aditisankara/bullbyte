@@ -35,4 +35,29 @@ export class MlSidecarService {
 				)
 			);
 	}
+
+	/**
+	 * Kicks off a fresh analysis run. The sidecar accepts the request (HTTP 202)
+	 * and processes asynchronously, reporting progress via the webhook (story 5.3).
+	 * Called only by the BullMQ analysis worker (story 5.1).
+	 */
+	analyze(
+		ticker: string
+	): Observable<AxiosResponse<{ jobId: string; status: string }>> {
+		return this.httpService
+			.post<{ jobId: string; status: string }>(
+				`${this.baseUrl}/analyze/${ticker}`
+			)
+			.pipe(
+				timeout(SIDECAR_TIMEOUT_MS),
+				catchError(() =>
+					throwError(
+						() =>
+							new ServiceUnavailableException(
+								'ML sidecar unavailable'
+							)
+					)
+				)
+			);
+	}
 }
