@@ -52,3 +52,32 @@
 - `_retrying` tenacity wrapper is recreated on every `_do_fetch` call — minor allocation waste; refactor to a class-level or module-level constant when optimizing the hot path
 - `EdgarFetchLog` Pydantic model is defined but never used in the logging path — spec requires its definition; wire it to enforce the log schema in a future observability story
 - No production shutdown hook for `await client._http_client.aclose()` on FastAPI app teardown — requires touching `src/main.py`; address in a production hardening story alongside other lifecycle hooks
+
+## Transcript coverage gap — revisit before Epic 4 if claim extraction yield is low (2026-05-26)
+
+EDGAR 8-K filings rarely include a full earnings call transcript as EX-99. Most only contain
+the earnings press release (EX-99.1), which has forward-looking language but not the CEO's
+spoken remarks verbatim. If claim extraction yield in Epic 4 is too low to be useful, consider:
+
+1. **Include EX-99.1 press releases as a claims source** — already fetched by the pipeline,
+   just filtered out by the keyword scorer. Forward-guidance language is rich enough for LLM
+   claim extraction even without the spoken-call format. Lowest effort.
+2. **Seek Alpha transcripts** — structured HTML, near-100% coverage of public companies.
+   Legally grey; evaluate before building.
+3. **Earnings call audio + OpenAI Whisper (OSS speech-to-text)** — fetch webcast audio URL
+   from the 8-K filing, transcribe locally. Full fidelity but operationally heavy (large audio
+   files, GPU recommended, speaker diarization needed for CEO attribution).
+
+The pipeline architecture (CIK resolution → filing discovery → exhibit scoring → text extraction)
+is reusable for any of the above; only the source URL and keyword scorer threshold change.
+
+## Deferred from: code review of 3-2-8-k-earnings-call-transcript-ingestion-and-parsing (2026-05-26)
+
+- 8000-char preamble may miss keywords in markup-heavy files — spec-mandated threshold (Task 6); revisit if real-world transcript recall is low
+- No deduplication across `recent` and paginated `files` blocks in submissions JSON — EDGAR pagination is non-overlapping by design; address if duplication is observed in production
+- Filing index table column order assumed stable — EDGAR HTML has been stable for years; re-evaluate if SEC changes the index format
+- `best_url` tracks last error URL, not most informative URL — minor logging inaccuracy; improve in a future observability story
+- `ParseStatus` as `Literal` not `StrEnum` — Pydantic validates correctly; consider StrEnum migration in a future type-safety story
+- `lxml` parser corrupts plain-text `.txt` filings with `<>` characters — spec mandates lxml; add `.txt` content-type detection in a future parser-quality story
+- No test for concurrent `_load_ticker_cik_map` race — asyncio concurrency testing requires additional infrastructure (e.g. `asyncio.TaskGroup`); address in a future test-quality story
+- No test for empty submissions JSON response — graceful fallback confirmed in code; add regression test in a future test-quality story

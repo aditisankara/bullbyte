@@ -1,3 +1,16 @@
+"""
+EDGAR HTTP client. Single entry point for all SEC EDGAR requests.
+
+Usage::
+
+    from src.core.edgar_client import get_client, EdgarFetchError
+
+    response = await get_client().fetch(url, ticker="TSLA", filing_type="submissions")
+
+Raises ``EdgarFetchError`` on any HTTP failure (retried or not). Never instantiate
+``EdgarClient`` directly — use ``get_client()`` to share the rate-limit semaphore.
+Requires ``EDGAR_USER_AGENT`` env var. Call ``reset_client()`` in tests only.
+"""
 import asyncio
 import os
 from typing import Optional
@@ -18,7 +31,10 @@ _client: Optional["EdgarClient"] = None
 
 
 class EdgarClient:
+    """Rate-limited EDGAR HTTP client. Use ``get_client()`` — do not instantiate directly."""
+
     def __init__(self, user_agent: str) -> None:
+        """``user_agent`` must be non-empty (sourced from ``EDGAR_USER_AGENT`` env var)."""
         if not user_agent.strip():
             raise ValueError("EDGAR_USER_AGENT environment variable must be set")
         self._user_agent = user_agent
@@ -28,7 +44,12 @@ class EdgarClient:
         )
 
     async def fetch(self, url: str, ticker: str, filing_type: str) -> httpx.Response:
-        """Fetch a URL from EDGAR, rate-limited to ≤10 req/s with retry on 429/5xx."""
+        """
+        Fetch ``url`` from EDGAR. Rate-limited to ≤10 req/s; retries on 429/5xx (max 3).
+
+        ``ticker`` and ``filing_type`` are metadata used in logs and ``EdgarFetchError``.
+        Raises ``EdgarFetchError`` on any HTTP failure (retried or not).
+        """
         await _rate_semaphore.acquire()
         asyncio.get_running_loop().call_later(1.0, _rate_semaphore.release)
         return await self._do_fetch(url, ticker, filing_type)
