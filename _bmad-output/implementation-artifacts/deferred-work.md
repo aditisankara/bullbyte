@@ -81,3 +81,10 @@ is reusable for any of the above; only the source URL and keyword scorer thresho
 - `lxml` parser corrupts plain-text `.txt` filings with `<>` characters — spec mandates lxml; add `.txt` content-type detection in a future parser-quality story
 - No test for concurrent `_load_ticker_cik_map` race — asyncio concurrency testing requires additional infrastructure (e.g. `asyncio.TaskGroup`); address in a future test-quality story
 - No test for empty submissions JSON response — graceful fallback confirmed in code; add regression test in a future test-quality story
+
+## Deferred from: code review of 3-3-10-q-10-k-financial-actuals-ingestion-and-parsing (2026-05-26, updated 2026-05-27)
+
+- No test for 10-K (Q4) `fp=="FY"` XBRL matching path — test gap not in the 13 specified tests; add in a future test-quality story once 10-K path is exercised against real data
+- No test for malformed quarter string input to `_quarter_to_period_end` (e.g. `"bad"`, `"Q5-2024"`) — not in specified 13 tests; add defensive tests when input validation is hardened
+- Tolerance boundary test uses 5-day offset, not the 45-day boundary — `test_extract_xbrl_metrics_period_end_tolerance_45_days` validates tolerance works but not the exact edge; strengthen in a future test-quality story
+- Amended filings (`10-Q/A`, `10-K/A`) excluded by `form == filing_type` filter in `_find_filing_accession` — per-spec behavior (exact form match mandated); known data gap if a company only has an amendment on file; evaluate real-world impact when 10-K/10-Q pipeline runs against production data

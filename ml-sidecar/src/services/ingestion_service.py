@@ -50,7 +50,7 @@ async def _load_ticker_cik_map() -> None:
         }
 
 
-async def _resolve_cik(ticker: str) -> str:
+async def resolve_cik(ticker: str) -> str:
     """Return zero-padded 10-digit CIK for ``ticker``, or raise ``ValueError``."""
     await _load_ticker_cik_map()
     cik = _TICKER_CIK_MAP.get(ticker.upper())
@@ -204,7 +204,7 @@ async def ingest_8k_transcripts(
     Returns:
         ``IngestionSummary`` with all results and aggregate counts. No DB writes.
     """
-    cik = await _resolve_cik(ticker)
+    cik = await resolve_cik(ticker)
     filings = await _get_8k_filings(cik, start_date, end_date)
 
     results: list[TranscriptResult] = []

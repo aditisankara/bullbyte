@@ -49,7 +49,7 @@
 # that doesn't conflict with the other developer's active story.
 
 generated: "2026-05-01"
-last_updated: "2026-05-26"  # story 1.1 + 1.3 + 1.5 + 1.6 done; Epic 1 complete; 3.1 done; 3.2 done; 3.3 ready-for-dev
+last_updated: "2026-05-27"  # story 1.1 + 1.3 + 1.5 + 1.6 done; Epic 1 complete; 3.1 done; 3.2 done; 3.3 done
 project: bullbyte
 project_key: NOKEY
 tracking_system: file-system
@@ -104,7 +104,7 @@ development_status:
 
   3-1-edgar-http-client-with-rate-limiting-queue: done        # needs 1.3
   3-2-8-k-earnings-call-transcript-ingestion-and-parsing: done  # needs 3.1
-  3-3-10-q-10-k-financial-actuals-ingestion-and-parsing: ready-for-dev   # needs 3.1; parallel with 3.2
+  3-3-10-q-10-k-financial-actuals-ingestion-and-parsing: done     # needs 3.1; parallel with 3.2
   3-4-temporal-alignment-engine: backlog              # needs 3.2 + 3.3
   3-5-yfinance-financial-data-supplement: backlog     # needs 3.3; parallel with 3.4
   3-6-postgresql-caching-and-re-ingestion-prevention: backlog # needs 3.2 + 3.3 + 1.2
