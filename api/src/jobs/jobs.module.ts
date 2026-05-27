@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { HttpModule } from '@nestjs/axios';
 import { JobsController } from './jobs.controller';
+import { JobsProgressController } from './jobs-progress.controller';
 import { ANALYSIS_QUEUE, JobsService } from './jobs.service';
+import { ProgressService } from './progress.service';
 import { AnalysisProcessor } from './analysis.processor';
 import { MlSidecarService } from '../common/ml-sidecar.service';
 
@@ -15,7 +17,9 @@ import { MlSidecarService } from '../common/ml-sidecar.service';
 		// it from both AppModule and JobsModule. See the 5.1 story Dev Notes.
 		HttpModule,
 	],
-	controllers: [JobsController],
-	providers: [JobsService, AnalysisProcessor, MlSidecarService],
+	controllers: [JobsController, JobsProgressController],
+	providers: [JobsService, ProgressService, AnalysisProcessor, MlSidecarService],
+	// ProgressService is exported so the 5.3 webhook relay can call publish().
+	exports: [ProgressService],
 })
 export class JobsModule {}
