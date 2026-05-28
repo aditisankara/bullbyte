@@ -89,6 +89,13 @@ is reusable for any of the above; only the source URL and keyword scorer thresho
 - Tolerance boundary test uses 5-day offset, not the 45-day boundary — `test_extract_xbrl_metrics_period_end_tolerance_45_days` validates tolerance works but not the exact edge; strengthen in a future test-quality story
 - Amended filings (`10-Q/A`, `10-K/A`) excluded by `form == filing_type` filter in `_find_filing_accession` — per-spec behavior (exact form match mandated); known data gap if a company only has an amendment on file; evaluate real-world impact when 10-K/10-Q pipeline runs against production data
 
+## Deferred from: code review of 3-5-yfinance-financial-data-supplement (2026-05-28)
+
+- No timeout on `quarterly_income_stmt` network call — blocked thread pool slot; a stalled HTTP connection holds a pool thread indefinitely with no timeout bound; add `asyncio.wait_for` wrapper or yfinance session timeout when production reliability is needed
+- No rate-limit/retry logic for yfinance calls — tenacity is already a project dependency; a single failure silently returns `[]`; add retry with backoff if yfinance throttling becomes an issue in production
+- No defensive guard for `quarterly_income_stmt` returning `None` (invalid/private tickers) — covered by outer `except Exception`, returns `[]` as intended; add explicit `if df is None or df.empty: return []` for clarity when the service is hardened
+- `_METRIC_TO_ROW_LABEL` covers only 6 metrics and silently skips unknown names — by design per spec; add a `logger.warning` for unmapped metric names when observability of supplement coverage gaps is needed
+
 ## Deferred from: code review of 3-4-temporal-alignment-engine (2026-05-27)
 
 - `acc_no.replace("-", "")` has no accession number format validation [temporal_aligner.py] — pre-existing pattern in financials_service.py; EDGAR is reliable source; scope creep for 3.4
