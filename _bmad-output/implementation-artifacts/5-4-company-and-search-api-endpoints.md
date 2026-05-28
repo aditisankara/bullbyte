@@ -1,6 +1,6 @@
 # Story 5.4: Company & Search API Endpoints
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -28,21 +28,21 @@ So that the Angular frontend can look up companies and display the top-level dat
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: `CompaniesModule` under `api/src/companies/` (AC1, AC2)
-  - [ ] `companies.controller.ts`: `GET companies/:ticker`, validate ticker via the existing `TickerValidationPipe`
-  - [ ] `companies.service.ts`: `getSummary(ticker)` — read `companies` + most-recent `analysis_jobs.status`; throw `NotFoundException({ code: 'TICKER_NOT_FOUND', details: { ticker } })` when absent
-  - [ ] `dto/company-summary.dto.ts`: camelCase shape; `jobStatus` derived from the canonical `jobStatusEnum`
-  - [ ] Register `CompaniesModule` in `AppModule`
+- [x] Task 1: `CompaniesModule` under `api/src/companies/` (AC1, AC2)
+  - [x] `companies.controller.ts`: `GET companies/:ticker`, validate ticker via the existing `TickerValidationPipe`
+  - [x] `companies.service.ts`: `getSummary(ticker)` — read `companies` + most-recent `analysis_jobs.status`; throw `NotFoundException({ code: 'TICKER_NOT_FOUND', details: { ticker } })` when absent
+  - [x] `dto/company-summary.dto.ts`: camelCase shape; `jobStatus` derived from the canonical `jobStatusEnum`
+  - [x] Register `CompaniesModule` in `AppModule`
 
-- [ ] Task 2: Reconcile the POST analyze overlap with 5.1 (AC3)
-  - [ ] AC3 is **already satisfied** by 5.1's `JobsService` (ensureCompany + QUEUED job). Do NOT duplicate the endpoint — confirm behaviour and, if helpful, lift the insert-if-missing into a shared helper both modules use.
+- [x] Task 2: Reconcile the POST analyze overlap with 5.1 (AC3)
+  - [x] AC3 is **already satisfied** by 5.1's `JobsService` (ensureCompany + QUEUED job). Confirmed: `POST /api/v1/companies/:ticker/analyze` is owned by `JobsController` (`@Controller('companies/:ticker')` + `@Post('analyze')`). Not duplicated here.
 
-- [ ] Task 3: Relocate `TickerValidationPipe` to `common/` (optional, recommended)
-  - [ ] It currently lives in `jobs/`. Both `jobs` and `companies` now use it — move to `api/src/common/` and update both imports to avoid a `companies → jobs` dependency.
+- [x] Task 3: Relocate `TickerValidationPipe` to `common/` (optional, recommended)
+  - [x] Moved `ticker-validation.pipe.ts` (+ spec) from `jobs/` to `api/src/common/`; updated both `jobs.controller.ts` and `companies.controller.ts` imports, removing the `companies → jobs` dependency.
 
-- [ ] Task 4: Tests (AC1, AC2)
-  - [ ] `companies.service.spec.ts`: existing ticker returns the summary with `jobStatus`; missing ticker throws `NotFoundException` with the `TICKER_NOT_FOUND` payload
-  - [ ] `companies.controller.spec.ts`: delegates to the service; invalid ticker rejected by the pipe
+- [x] Task 4: Tests (AC1, AC2)
+  - [x] `companies.service.spec.ts`: existing ticker returns the summary with `jobStatus`; never-analysed ticker yields `null` `lastAnalysedAt`/`jobStatus`; missing ticker throws `NotFoundException` with the `TICKER_NOT_FOUND` payload
+  - [x] `companies.controller.spec.ts`: delegates to the service. (Invalid-ticker rejection is covered by `common/ticker-validation.pipe.spec.ts`, since the pipe is applied by the framework, not in a unit-instantiated controller.)
 
 ## Dev Notes
 
@@ -66,16 +66,27 @@ Inject the global `DRIZZLE` token (`@Inject(DRIZZLE) db: DrizzleDB`). `jobStatus
 
 ## Dev Agent Record
 ### Agent Model Used
-(scaffold authored by claude-opus-4-7; implementation TBD)
+claude-opus-4-7 (scaffold + implementation)
 ### Completion Notes List
-- Scaffold only: CompaniesModule + GET endpoint created; tests (Task 4) pending.
+- Endpoint scaffold (CompaniesModule + GET summary) confirmed correct against AC1/AC2/AC4; all dependencies verified (schema fields, AllExceptionsFilter error shape, AppModule registration).
+- AC3 confirmed owned by 5.1's `JobsController`/`JobsService` — not duplicated.
+- Task 3: `TickerValidationPipe` relocated `jobs/` → `common/`; both controllers updated; `companies → jobs` coupling removed.
+- Task 4: service + controller specs added. `npx jest` (companies, common, jobs) 18/18 green; `nest build` clean; `eslint` 0 errors (only the project-standard `no-unsafe-argument` test-mock warnings).
 ### File List
 - _bmad-output/implementation-artifacts/5-4-company-and-search-api-endpoints.md
 - api/src/companies/companies.module.ts
-- api/src/companies/companies.controller.ts
+- api/src/companies/companies.controller.ts (TickerValidationPipe import → common/)
 - api/src/companies/companies.service.ts
+- api/src/companies/companies.service.spec.ts (new)
+- api/src/companies/companies.controller.spec.ts (new)
 - api/src/companies/dto/company-summary.dto.ts
+- api/src/common/ticker-validation.pipe.ts (moved from jobs/)
+- api/src/common/ticker-validation.pipe.spec.ts (moved from jobs/)
+- api/src/jobs/jobs.controller.ts (TickerValidationPipe import → common/)
+- api/src/jobs/ticker-validation.pipe.ts (removed)
+- api/src/jobs/ticker-validation.pipe.spec.ts (removed)
 - api/src/app.module.ts (modified)
 
 ## Change Log
 - 2026-05-27: Story drafted + module scaffolded by claude-opus-4-7.
+- 2026-05-28: Implementation completed — pipe relocated to common/, service + controller specs added; story moved to review by claude-opus-4-7.

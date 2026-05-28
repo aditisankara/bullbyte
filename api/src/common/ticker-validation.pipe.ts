@@ -4,7 +4,7 @@ const TICKER_PATTERN = /^[A-Z.]{1,10}$/;
 
 /**
  * Normalises a ticker path param to uppercase and validates its shape.
- * Minimal here; 5.4 (search/company endpoints) may centralise ticker handling.
+ * Shared by the jobs and companies controllers.
  */
 @Injectable()
 export class TickerValidationPipe implements PipeTransform<string, string> {

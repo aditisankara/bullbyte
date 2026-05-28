@@ -1,8 +1,7 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { CompaniesService } from './companies.service';
 import { CompanySummaryDto } from './dto/company-summary.dto';
-// TODO(5.4 Task 3): relocate TickerValidationPipe to common/ to drop the jobs dependency.
-import { TickerValidationPipe } from '../jobs/ticker-validation.pipe';
+import { TickerValidationPipe } from '../common/ticker-validation.pipe';
 
 @Controller('companies')
 export class CompaniesController {

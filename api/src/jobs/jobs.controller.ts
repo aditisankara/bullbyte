@@ -2,7 +2,7 @@ import { Controller, HttpStatus, Param, Post, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { JobsService } from './jobs.service';
 import { AnalyzeResponseDto } from './dto/analyze-response.dto';
-import { TickerValidationPipe } from './ticker-validation.pipe';
+import { TickerValidationPipe } from '../common/ticker-validation.pipe';
 
 @Controller('companies/:ticker')
 export class JobsController {
