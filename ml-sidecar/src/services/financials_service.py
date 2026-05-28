@@ -15,6 +15,7 @@ from src.core.edgar_client import EdgarFetchError, get_client
 from src.core.logging import get_logger
 from src.models.financials_models import FinancialMetric, FinancialMetricStatus, FinancialsResult
 from src.services.ingestion_service import resolve_cik
+from src.services.yfinance_service import supplement_with_yfinance
 
 logger = get_logger("ml-sidecar.financials_service")
 
@@ -510,6 +511,21 @@ async def ingest_financial_actuals(ticker: str, quarter: str) -> FinancialsResul
         cik, accession_no, ticker, quarter, filing_type, filing_url
     )
     metrics.extend(guidance_metrics)
+
+    # yfinance supplement: fill in AMBIGUOUS or missing XBRL metrics
+    expected_metrics = set(XBRL_METRIC_CONCEPTS.keys())
+    edgar_success = {m.metric_name for m in metrics if m.parse_status == "SUCCESS"}
+    ambiguous = {m.metric_name for m in metrics if m.parse_status == "AMBIGUOUS" and m.metric_name in expected_metrics}
+    missing = expected_metrics - {m.metric_name for m in metrics}
+    supplement_targets = list(ambiguous | missing)
+
+    if supplement_targets:
+        yf_metrics = await supplement_with_yfinance(ticker, quarter, supplement_targets)
+        yf_added_names = {m.metric_name for m in yf_metrics if m.metric_name not in edgar_success}
+        metrics = [m for m in metrics if not (m.metric_name in yf_added_names and m.parse_status == "AMBIGUOUS")]
+        for yf_metric in yf_metrics:
+            if yf_metric.metric_name not in edgar_success:
+                metrics.append(yf_metric)
 
     if not metrics:
         result_status = "PARTIAL"

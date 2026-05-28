@@ -5,6 +5,8 @@ from pydantic import BaseModel
 
 FinancialMetricStatus = Literal["SUCCESS", "AMBIGUOUS", "PARSE_FAILURE", "FETCH_ERROR"]
 
+FinancialMetricSource = Literal["edgar", "yfinance"]
+
 FinancialsResultStatus = Literal["SUCCESS", "PARTIAL", "FILING_NOT_YET_AVAILABLE", "FETCH_ERROR"]
 
 
@@ -18,6 +20,7 @@ class FinancialMetric(BaseModel):
     filing_url: str
     filing_type: str
     parse_status: FinancialMetricStatus
+    source: FinancialMetricSource = "edgar"
 
 
 class FinancialsResult(BaseModel):
