@@ -88,3 +88,12 @@ is reusable for any of the above; only the source URL and keyword scorer thresho
 - No test for malformed quarter string input to `_quarter_to_period_end` (e.g. `"bad"`, `"Q5-2024"`) — not in specified 13 tests; add defensive tests when input validation is hardened
 - Tolerance boundary test uses 5-day offset, not the 45-day boundary — `test_extract_xbrl_metrics_period_end_tolerance_45_days` validates tolerance works but not the exact edge; strengthen in a future test-quality story
 - Amended filings (`10-Q/A`, `10-K/A`) excluded by `form == filing_type` filter in `_find_filing_accession` — per-spec behavior (exact form match mandated); known data gap if a company only has an amendment on file; evaluate real-world impact when 10-K/10-Q pipeline runs against production data
+
+## Deferred from: code review of 3-4-temporal-alignment-engine (2026-05-27)
+
+- `acc_no.replace("-", "")` has no accession number format validation [temporal_aligner.py] — pre-existing pattern in financials_service.py; EDGAR is reliable source; scope creep for 3.4
+- `str(int(cik))` will raise uncaught `ValueError` if non-numeric CIK passed [temporal_aligner.py] — internal function; `resolve_cik` guarantees zero-padded numeric string; address if CIK handling is generalized
+- Filing date window lower bound (`period_end_dt <= filing_dt`) excludes any filing filed before period end [temporal_aligner.py] — calendar-quarter design is intentional; fiscal year offset handled by alt-quarter fallback path
+- Earliest filing selected over later amendments within 180-day window [temporal_aligner.py] — pre-existing pattern in financials_service.py; for temporal alignment the original filing is the canonical source; revisit if amendment handling is needed
+- `_quarter_to_period_end` inconsistently lacks `len(parts) != 2` guard vs `_next_quarter` [temporal_aligner.py] — `IndexError` is caught and re-raised as `ValueError`; works correctly; minor style inconsistency
+- `PENDING` status assigned `LOW` confidence — spec AC3 only requires `PENDING` status; `LOW` is the most reasonable default given no filing is confirmed; clarify if consumers need a distinct confidence value for pending states
