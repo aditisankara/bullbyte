@@ -143,6 +143,112 @@ async def insert_reasoning_trace(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# transcripts (cache)
+# ---------------------------------------------------------------------------
+
+
+async def get_cached_transcript(ticker: str, quarter: str) -> asyncpg.Record | None:
+    """Return cached transcript row for (ticker, quarter), or None if not cached."""
+    pool = await get_pool()
+    return await pool.fetchrow(
+        """
+        SELECT ticker, quarter, filing_date, raw_text, filing_url, parse_status
+        FROM transcripts
+        WHERE ticker = $1 AND quarter = $2
+        """,
+        ticker,
+        quarter,
+    )
+
+
+async def insert_transcript(
+    *,
+    ticker: str,
+    quarter: str,
+    filing_date: str,
+    raw_text: str,
+    filing_url: str,
+    parse_status: str,
+) -> None:
+    """Persist a transcript to the cache. ON CONFLICT (ticker, quarter) DO NOTHING."""
+    pool = await get_pool()
+    row_id = str(uuid.uuid4())
+    await pool.execute(
+        """
+        INSERT INTO transcripts
+            (id, ticker, quarter, filing_date, raw_text, filing_url, parse_status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (ticker, quarter) DO NOTHING
+        """,
+        row_id,
+        ticker,
+        quarter,
+        filing_date,
+        raw_text,
+        filing_url,
+        parse_status,
+    )
+
+
+# ---------------------------------------------------------------------------
+# financial_actuals (cache)
+# ---------------------------------------------------------------------------
+
+
+async def get_cached_financial_actuals(ticker: str, quarter: str) -> asyncpg.Record | None:
+    """Return cached financial_actuals row for (ticker, quarter), or None if not cached."""
+    pool = await get_pool()
+    return await pool.fetchrow(
+        """
+        SELECT ticker, quarter, filing_type, status, filing_url, metrics
+        FROM financial_actuals
+        WHERE ticker = $1 AND quarter = $2
+        """,
+        ticker,
+        quarter,
+    )
+
+
+async def insert_financial_actuals(
+    *,
+    ticker: str,
+    quarter: str,
+    filing_type: str,
+    status: str,
+    filing_url: str,
+    metrics_json: str,
+) -> None:
+    """Persist financial actuals to the cache. ON CONFLICT (ticker, quarter) DO NOTHING.
+
+    metrics_json must be a pre-serialised JSON string:
+        json.dumps([m.model_dump() for m in result.metrics])
+    asyncpg will cast it to JSONB via the $7::jsonb parameter binding.
+    """
+    pool = await get_pool()
+    row_id = str(uuid.uuid4())
+    await pool.execute(
+        """
+        INSERT INTO financial_actuals
+            (id, ticker, quarter, filing_type, status, filing_url, metrics)
+        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+        ON CONFLICT (ticker, quarter) DO NOTHING
+        """,
+        row_id,
+        ticker,
+        quarter,
+        filing_type,
+        status,
+        filing_url,
+        metrics_json,
+    )
+
+
+# ---------------------------------------------------------------------------
+# tool_call_logs
+# ---------------------------------------------------------------------------
+
+
 async def insert_tool_call_log(
     *,
     job_id: str,

@@ -1,6 +1,6 @@
 # Story 3.6: PostgreSQL Caching & Re-ingestion Prevention
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -31,58 +31,58 @@ So that repeat requests for the same ticker and quarter return cached data insta
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add `transcripts` and `financialActuals` tables to `api/src/db/schema.ts` (AC: 1, 2, 3, 4)
-  - [ ] Add `unique` to the `drizzle-orm/pg-core` named imports
-  - [ ] Add `transcripts` table (see Dev Notes for exact definition)
-  - [ ] Add `financialActuals` table (see Dev Notes for exact definition)
-  - [ ] Export `Transcript`, `NewTranscript`, `FinancialActuals`, `NewFinancialActuals` TypeScript types via `$inferSelect` / `$inferInsert`
-  - [ ] Do NOT modify any existing table definitions — append only
+- [x] Task 1: Add `transcripts` and `financialActuals` tables to `api/src/db/schema.ts` (AC: 1, 2, 3, 4)
+  - [x] Add `unique` to the `drizzle-orm/pg-core` named imports
+  - [x] Add `transcripts` table (see Dev Notes for exact definition)
+  - [x] Add `financialActuals` table (see Dev Notes for exact definition)
+  - [x] Export `Transcript`, `NewTranscript`, `FinancialActuals`, `NewFinancialActuals` TypeScript types via `$inferSelect` / `$inferInsert`
+  - [x] Do NOT modify any existing table definitions — append only
 
-- [ ] Task 2: Generate and commit the Drizzle migration (AC: 3)
-  - [ ] From the `api/` directory, run `npx drizzle-kit generate`
-  - [ ] Confirm a new `0001_*.sql` file is generated in `api/src/db/migrations/`
-  - [ ] Review the SQL: verify it contains `CREATE TABLE "transcripts"`, `CREATE TABLE "financial_actuals"`, and both unique constraints
-  - [ ] Commit the generated SQL file as-is — do NOT edit it manually or squash it into `0000_certain_warbird.sql`
+- [x] Task 2: Generate and commit the Drizzle migration (AC: 3)
+  - [x] From the `api/` directory, run `npx drizzle-kit generate`
+  - [x] Confirm a new `0001_*.sql` file is generated in `api/src/db/migrations/`
+  - [x] Review the SQL: verify it contains `CREATE TABLE "transcripts"`, `CREATE TABLE "financial_actuals"`, and both unique constraints
+  - [x] Commit the generated SQL file as-is — do NOT edit it manually or squash it into `0000_certain_warbird.sql`
 
-- [ ] Task 3: Add asyncpg cache helpers to `ml-sidecar/src/db/queries.py` (AC: 1, 2, 3)
-  - [ ] Add `get_cached_transcript(ticker, quarter) -> asyncpg.Record | None` — SELECT by (ticker, quarter) from `transcripts`
-  - [ ] Add `insert_transcript(*, ticker, quarter, filing_date, raw_text, filing_url, parse_status) -> None` — INSERT with `ON CONFLICT (ticker, quarter) DO NOTHING`
-  - [ ] Add `get_cached_financial_actuals(ticker, quarter) -> asyncpg.Record | None` — SELECT by (ticker, quarter) from `financial_actuals`
-  - [ ] Add `insert_financial_actuals(*, ticker, quarter, filing_type, status, filing_url, metrics_json: str) -> None` — INSERT with `ON CONFLICT (ticker, quarter) DO NOTHING`; pass `metrics_json` as `$N::jsonb`
-  - [ ] Follow the exact same structural pattern as existing helpers in `queries.py`: `pool = await get_pool()`, then `pool.fetchrow(...)` or `pool.execute(...)`
-  - [ ] Do NOT modify any existing helper functions
+- [x] Task 3: Add asyncpg cache helpers to `ml-sidecar/src/db/queries.py` (AC: 1, 2, 3)
+  - [x] Add `get_cached_transcript(ticker, quarter) -> asyncpg.Record | None` — SELECT by (ticker, quarter) from `transcripts`
+  - [x] Add `insert_transcript(*, ticker, quarter, filing_date, raw_text, filing_url, parse_status) -> None` — INSERT with `ON CONFLICT (ticker, quarter) DO NOTHING`
+  - [x] Add `get_cached_financial_actuals(ticker, quarter) -> asyncpg.Record | None` — SELECT by (ticker, quarter) from `financial_actuals`
+  - [x] Add `insert_financial_actuals(*, ticker, quarter, filing_type, status, filing_url, metrics_json: str) -> None` — INSERT with `ON CONFLICT (ticker, quarter) DO NOTHING`; pass `metrics_json` as `$N::jsonb`
+  - [x] Follow the exact same structural pattern as existing helpers in `queries.py`: `pool = await get_pool()`, then `pool.fetchrow(...)` or `pool.execute(...)`
+  - [x] Do NOT modify any existing helper functions
 
-- [ ] Task 4: Add cache check and persist in `ml-sidecar/src/services/ingestion_service.py` (AC: 1, 2, 4)
-  - [ ] Import `get_cached_transcript`, `insert_transcript` from `src.db.queries`
-  - [ ] Add module-level lock registry for concurrency safety (see Dev Notes — `_TRANSCRIPT_CACHE_LOCKS` dict + meta lock)
-  - [ ] In `ingest_8k_transcripts`, immediately after `quarter = _filing_date_to_quarter(filing_date)` (inside the `for filing in filings:` loop), acquire the per-quarter asyncio lock and add cache-check logic (see Dev Notes for exact snippet)
-  - [ ] If cache hit: reconstruct `TranscriptResult`, append to `results`, increment `transcripts_extracted`, log `cache_hit: true`, then `continue`
-  - [ ] After the existing `results.append(TranscriptResult(...))` call: if `best_status == "SUCCESS"`, call `await insert_transcript(...)` — persist only SUCCESS transcripts
-  - [ ] Add `cache_hit: false` structured log after completing a fresh EDGAR fetch, with `fetch_duration_ms` field
+- [x] Task 4: Add cache check and persist in `ml-sidecar/src/services/ingestion_service.py` (AC: 1, 2, 4)
+  - [x] Import `get_cached_transcript`, `insert_transcript` from `src.db.queries`
+  - [x] Add module-level lock registry for concurrency safety (see Dev Notes — `_TRANSCRIPT_CACHE_LOCKS` dict + meta lock)
+  - [x] In `ingest_8k_transcripts`, immediately after `quarter = _filing_date_to_quarter(filing_date)` (inside the `for filing in filings:` loop), acquire the per-quarter asyncio lock and add cache-check logic (see Dev Notes for exact snippet)
+  - [x] If cache hit: reconstruct `TranscriptResult`, append to `results`, increment `transcripts_extracted`, log `cache_hit: true`, then `continue`
+  - [x] After the existing `results.append(TranscriptResult(...))` call: if `best_status == "SUCCESS"`, call `await insert_transcript(...)` — persist only SUCCESS transcripts
+  - [x] Add `cache_hit: false` structured log after completing a fresh EDGAR fetch, with `fetch_duration_ms` field
 
-- [ ] Task 5: Add cache check and persist in `ml-sidecar/src/services/financials_service.py` (AC: 1, 2, 4)
-  - [ ] Import `get_cached_financial_actuals`, `insert_financial_actuals` from `src.db.queries`
-  - [ ] Import `asyncio` (already imported? verify), `json`, `time`
-  - [ ] Add module-level lock registry for concurrency safety (see Dev Notes — `_FINANCIALS_CACHE_LOCKS` dict + meta lock)
-  - [ ] At the very top of `ingest_financial_actuals` (before any EDGAR calls): record `start_time = time.monotonic()`, then acquire per-quarter lock and check `get_cached_financial_actuals(ticker, quarter)` (see Dev Notes)
-  - [ ] If cache hit: log `cache_hit: true`, reconstruct `FinancialsResult` from cache row (deserialise `metrics` JSONB → `list[FinancialMetric]`), return immediately — no EDGAR calls
-  - [ ] After computing `result_status` and constructing the final `FinancialsResult`: if `result.status in ("SUCCESS", "PARTIAL")`, call `await insert_financial_actuals(...)` with `metrics_json = json.dumps([m.model_dump() for m in result.metrics])`
-  - [ ] Log `cache_hit: false` with `fetch_duration_ms = int((time.monotonic() - start_time) * 1000)` after the EDGAR fetch path completes
-  - [ ] Do NOT change the function signature of `ingest_financial_actuals`
+- [x] Task 5: Add cache check and persist in `ml-sidecar/src/services/financials_service.py` (AC: 1, 2, 4)
+  - [x] Import `get_cached_financial_actuals`, `insert_financial_actuals` from `src.db.queries`
+  - [x] Import `asyncio` (already imported? verify), `json`, `time`
+  - [x] Add module-level lock registry for concurrency safety (see Dev Notes — `_FINANCIALS_CACHE_LOCKS` dict + meta lock)
+  - [x] At the very top of `ingest_financial_actuals` (before any EDGAR calls): record `start_time = time.monotonic()`, then acquire per-quarter lock and check `get_cached_financial_actuals(ticker, quarter)` (see Dev Notes)
+  - [x] If cache hit: log `cache_hit: true`, reconstruct `FinancialsResult` from cache row (deserialise `metrics` JSONB → `list[FinancialMetric]`), return immediately — no EDGAR calls
+  - [x] After computing `result_status` and constructing the final `FinancialsResult`: if `result.status in ("SUCCESS", "PARTIAL")`, call `await insert_financial_actuals(...)` with `metrics_json = json.dumps([m.model_dump() for m in result.metrics])`
+  - [x] Log `cache_hit: false` with `fetch_duration_ms = int((time.monotonic() - start_time) * 1000)` after the EDGAR fetch path completes
+  - [x] Do NOT change the function signature of `ingest_financial_actuals`
 
-- [ ] Task 6: Write tests `tests/test_caching.py` (AC: 1, 2, 3, 4)
-  - [ ] Test: transcript cache hit — mock `get_cached_transcript` to return a mock Record; verify `get_client().fetch` is NOT called at all; verify returned `IngestionSummary` has the expected `TranscriptResult`
-  - [ ] Test: transcript cache miss — mock `get_cached_transcript` to return `None`; verify `get_client().fetch` IS called; verify `insert_transcript` is called with correct ticker/quarter/parse_status
-  - [ ] Test: financials cache hit — mock `get_cached_financial_actuals` to return a mock Record with pre-built JSON metrics; verify `ingest_financial_actuals` returns `FinancialsResult` with correct metrics; verify no EDGAR calls made
-  - [ ] Test: financials cache miss — mock `get_cached_financial_actuals` to return `None`; complete existing EDGAR mock chain; verify `insert_financial_actuals` is called with `status="SUCCESS"` or `"PARTIAL"`
-  - [ ] Test: `cache_hit: true` log emitted on cache hit for both transcript and financials paths (use `caplog`)
-  - [ ] Test: `cache_hit: false` log with `fetch_duration_ms` emitted on cache miss for both paths
-  - [ ] Test: non-cacheable status not persisted — mock a `FinancialsResult` with `status="FETCH_ERROR"`; verify `insert_financial_actuals` is NOT called
-  - [ ] Test: non-SUCCESS transcript not persisted — set `best_status="PARSE_FAILURE"`; verify `insert_transcript` is NOT called
+- [x] Task 6: Write tests `tests/test_caching.py` (AC: 1, 2, 3, 4)
+  - [x] Test: transcript cache hit — mock `get_cached_transcript` to return a mock Record; verify `get_client().fetch` is NOT called at all; verify returned `IngestionSummary` has the expected `TranscriptResult`
+  - [x] Test: transcript cache miss — mock `get_cached_transcript` to return `None`; verify `get_client().fetch` IS called; verify `insert_transcript` is called with correct ticker/quarter/parse_status
+  - [x] Test: financials cache hit — mock `get_cached_financial_actuals` to return a mock Record with pre-built JSON metrics; verify `ingest_financial_actuals` returns `FinancialsResult` with correct metrics; verify no EDGAR calls made
+  - [x] Test: financials cache miss — mock `get_cached_financial_actuals` to return `None`; complete existing EDGAR mock chain; verify `insert_financial_actuals` is called with `status="SUCCESS"` or `"PARTIAL"`
+  - [x] Test: `cache_hit: true` log emitted on cache hit for both transcript and financials paths (use `caplog`)
+  - [x] Test: `cache_hit: false` log with `fetch_duration_ms` emitted on cache miss for both paths
+  - [x] Test: non-cacheable status not persisted — mock a `FinancialsResult` with `status="FETCH_ERROR"`; verify `insert_financial_actuals` is NOT called
+  - [x] Test: non-SUCCESS transcript not persisted — set `best_status="PARSE_FAILURE"`; verify `insert_transcript` is NOT called
 
-- [ ] Task 7: Verify pre-existing tests still pass
-  - [ ] Run `pytest` from `ml-sidecar/` — all 114 pre-existing tests must pass, 0 regressions
-  - [ ] New imports in services must not break any existing test that mocks at the service level
+- [x] Task 7: Verify pre-existing tests still pass
+  - [x] Run `pytest` from `ml-sidecar/` — all 114 pre-existing tests must pass, 0 regressions
+  - [x] New imports in services must not break any existing test that mocks at the service level
 
 ## Dev Notes
 
@@ -695,20 +695,47 @@ As of story 3.5, the test suite has **114 tests**. Run `pytest` after implementa
 
 ### Agent Model Used
 
-_to be filled in by dev agent_
+claude-sonnet-4-6
 
 ### Debug Log References
 
-_to be filled in by dev agent_
+None — implementation went cleanly without debugging detours.
 
 ### Completion Notes List
 
-_to be filled in by dev agent_
+- Added `unique` import and appended `transcripts` + `financialActuals` table definitions to `api/src/db/schema.ts`. All existing tables left untouched.
+- Ran `npx drizzle-kit generate` from `api/`; generated `0001_wakeful_polaris.sql` containing both CREATE TABLE statements with UNIQUE constraints and btree indexes. SQL not hand-edited.
+- Added four asyncpg helpers to `ml-sidecar/src/db/queries.py` following the existing UUID-from-Python + pool.execute/fetchrow pattern: `get_cached_transcript`, `insert_transcript` (ON CONFLICT DO NOTHING), `get_cached_financial_actuals`, `insert_financial_actuals` (metrics as `::jsonb`).
+- Integrated cache-check in `ingest_8k_transcripts`: per-quarter asyncio lock acquired after computing `quarter`, fast-path cache hit returns immediately, cache miss wraps the entire EDGAR fetch inside the lock, inserts on SUCCESS only.
+- Integrated cache-check in `ingest_financial_actuals`: double-checked locking pattern (fast-path no-lock check → acquire lock → re-check → EDGAR fetch). Added `_reconstruct_financials_result` helper. `_quarter_to_filing_type` call moved inside the lock (slow path only). Inserts on SUCCESS or PARTIAL. All early-return error paths bypass persist.
+- Added `asyncpg` import to `financials_service.py` for the `asyncpg.Record` type annotation on `_reconstruct_financials_result`.
+- Added `tests/test_caching.py` with 10 tests covering: transcript cache hit (EDGAR skipped, log emitted), transcript cache miss (insert called, log with fetch_duration_ms), PARSE_FAILURE not persisted, financials cache hit (EDGAR skipped, log emitted), financials cache miss (insert called, log with fetch_duration_ms), FETCH_ERROR not persisted.
+- Added two autouse fixtures to `tests/conftest.py`: `_mock_db_cache` patches all four cache helpers to cache-miss/noop so existing unit tests need no DB; `_reset_lock_registries` clears per-(ticker,quarter) lock dicts and `_TICKER_CIK_MAP` between tests to prevent event-loop cross-contamination.
+- Full test suite: 114 pre-existing (0 regressions) + 10 new = **124 passing**.
 
 ### File List
 
-_to be filled in by dev agent_
+- `api/src/db/schema.ts` — updated: added `unique` import, `transcripts` and `financialActuals` table definitions + TypeScript types
+- `api/src/db/migrations/0001_wakeful_polaris.sql` — new: generated Drizzle migration
+- `ml-sidecar/src/db/queries.py` — updated: added `get_cached_transcript`, `insert_transcript`, `get_cached_financial_actuals`, `insert_financial_actuals`
+- `ml-sidecar/src/services/ingestion_service.py` — updated: cache-check + persist in `ingest_8k_transcripts`; `_TRANSCRIPT_CACHE_LOCKS` lock registry
+- `ml-sidecar/src/services/financials_service.py` — updated: cache-check + persist in `ingest_financial_actuals`; `_FINANCIALS_CACHE_LOCKS` lock registry; `_reconstruct_financials_result` helper; `asyncpg` import
+- `ml-sidecar/tests/test_caching.py` — new: 10 caching tests
+- `ml-sidecar/tests/conftest.py` — updated: `_mock_db_cache` and `_reset_lock_registries` autouse fixtures
 
 ## Change Log
 
 - 2026-05-28: Story created by bmad-create-story.
+- 2026-05-28: Story implemented by dev agent (claude-sonnet-4-6). All 7 tasks complete. 124/124 tests passing.
+- 2026-05-28: Code review by bmad-code-review (claude-sonnet-4-6). 5 patches, 3 deferred, 8 dismissed.
+
+### Review Findings
+
+- [ ] [Review][Patch] `_reset_lock_registries` does not clear `_TRANSCRIPT_CACHE_LOCKS_META` / `_FINANCIALS_CACHE_LOCKS_META` — stale meta-locks survive across pytest function-scoped event loops [ml-sidecar/tests/conftest.py]
+- [ ] [Review][Patch] `cache_hit: false` log only emitted on `best_status == "SUCCESS"` in `ingest_8k_transcripts` — AC2 requires the log on all cache-miss paths (PARSE_FAILURE, FETCH_ERROR, NO_TRANSCRIPT also hit EDGAR) [ml-sidecar/src/services/ingestion_service.py]
+- [ ] [Review][Patch] Missing test: `FILING_NOT_YET_AVAILABLE` financials result must not be persisted — spec Task 6 lists this as a distinct required test case, only FETCH_ERROR is covered [ml-sidecar/tests/test_caching.py]
+- [ ] [Review][Patch] Missing test: `NO_TRANSCRIPT` transcript result must not be persisted — spec Task 6 requires non-SUCCESS transcript tests beyond PARSE_FAILURE [ml-sidecar/tests/test_caching.py]
+- [ ] [Review][Patch] Cache-hit path unconditionally increments `transcripts_extracted` even when `cached["parse_status"] != "SUCCESS"` — asymmetric with non-cache path which guards on `best_status == "SUCCESS"` [ml-sidecar/src/services/ingestion_service.py]
+- [x] [Review][Defer] `_reconstruct_financials_result` raises uncaught `ValidationError` if DB JSONB row has schema not matching current `FinancialMetric` — pre-existing future risk; handle in a schema-evolution story [ml-sidecar/src/services/financials_service.py] — deferred, pre-existing
+- [x] [Review][Defer] `PARTIAL` financials cached permanently with no invalidation mechanism — SUCCESS data from a later EDGAR fetch is never used once PARTIAL is stored; deliberate spec choice, revisit with TTL story [ml-sidecar/src/db/queries.py] — deferred, pre-existing
+- [x] [Review][Defer] `fetch_duration_ms` in financials cache-miss log includes fast-path DB check and lock wait, not only EDGAR fetch — misleading for performance monitoring; fix label or move `start_time` in a future observability story [ml-sidecar/src/services/financials_service.py] — deferred, pre-existing

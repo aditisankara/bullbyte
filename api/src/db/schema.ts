@@ -2,6 +2,7 @@ import {
 	AnyPgColumn,
 	check,
 	index,
+	unique,
 	numeric,
 	integer,
 	boolean,
@@ -158,3 +159,49 @@ export const toolCallLogs = pgTable('tool_call_logs', {
 
 export type ToolCallLog = typeof toolCallLogs.$inferSelect;
 export type NewToolCallLog = typeof toolCallLogs.$inferInsert;
+
+export const transcripts = pgTable(
+	'transcripts',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		ticker: text('ticker').notNull(),
+		quarter: text('quarter').notNull(),     // "Q3-2024" format
+		filingDate: text('filing_date').notNull(),
+		rawText: text('raw_text').notNull(),
+		filingUrl: text('filing_url').notNull(),
+		parseStatus: text('parse_status').notNull(),  // always "SUCCESS" when cached
+		ingestedAt: timestamp('ingested_at', { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		unique('transcripts_ticker_quarter_unique').on(t.ticker, t.quarter),
+		index('idx_transcripts_ticker').on(t.ticker),
+	]
+);
+
+export type Transcript = typeof transcripts.$inferSelect;
+export type NewTranscript = typeof transcripts.$inferInsert;
+
+export const financialActuals = pgTable(
+	'financial_actuals',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		ticker: text('ticker').notNull(),
+		quarter: text('quarter').notNull(),     // "Q3-2024" format
+		filingType: text('filing_type').notNull(),  // "10-Q" or "10-K"
+		status: text('status').notNull(),       // "SUCCESS" or "PARTIAL" when cached
+		filingUrl: text('filing_url').notNull(),
+		metrics: jsonb('metrics').notNull(),    // serialised list[FinancialMetric]
+		ingestedAt: timestamp('ingested_at', { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		unique('financial_actuals_ticker_quarter_unique').on(t.ticker, t.quarter),
+		index('idx_financial_actuals_ticker').on(t.ticker),
+	]
+);
+
+export type FinancialActuals = typeof financialActuals.$inferSelect;
+export type NewFinancialActuals = typeof financialActuals.$inferInsert;

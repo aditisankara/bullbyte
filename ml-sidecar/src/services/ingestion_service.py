@@ -2,17 +2,20 @@
 8-K earnings call transcript ingestion service.
 
 Entry point: ``ingest_8k_transcripts(ticker, start_date, end_date)``
-Returns an in-memory ``IngestionSummary`` — no DB writes (persistence is story 3.6).
+Returns an ``IngestionSummary``. Checks PostgreSQL cache before fetching from EDGAR
+and persists SUCCESS transcripts after fetching.
 All HTTP calls go through ``get_client()`` from ``src.core.edgar_client``.
 """
 import asyncio
 import re
+import time
 from datetime import datetime
 
 from bs4 import BeautifulSoup
 
 from src.core.edgar_client import EdgarFetchError, get_client
 from src.core.logging import get_logger
+from src.db.queries import get_cached_transcript, insert_transcript
 from src.models.ingestion_models import IngestionSummary, ParseStatus, TranscriptResult
 
 logger = get_logger("ml-sidecar.ingestion_service")
@@ -21,6 +24,19 @@ logger = get_logger("ml-sidecar.ingestion_service")
 _TICKER_CIK_MAP: dict[str, str] = {}
 # asyncio.Lock guards against concurrent coroutines racing to populate _TICKER_CIK_MAP.
 _cik_map_lock = asyncio.Lock()
+
+# Per (ticker, quarter) asyncio locks — prevent duplicate EDGAR fetches under concurrency (NFR11)
+_TRANSCRIPT_CACHE_LOCKS: dict[str, asyncio.Lock] = {}
+_TRANSCRIPT_CACHE_LOCKS_META = asyncio.Lock()
+
+
+async def _get_transcript_lock(ticker: str, quarter: str) -> asyncio.Lock:
+    key = f"{ticker}:{quarter}"
+    async with _TRANSCRIPT_CACHE_LOCKS_META:
+        if key not in _TRANSCRIPT_CACHE_LOCKS:
+            _TRANSCRIPT_CACHE_LOCKS[key] = asyncio.Lock()
+        return _TRANSCRIPT_CACHE_LOCKS[key]
+
 
 _TRANSCRIPT_KEYWORDS = [
     "operator",
@@ -202,7 +218,7 @@ async def ingest_8k_transcripts(
         end_date:   ISO date string ``"YYYY-MM-DD"`` (inclusive).
 
     Returns:
-        ``IngestionSummary`` with all results and aggregate counts. No DB writes.
+        ``IngestionSummary`` with all results and aggregate counts.
     """
     cik = await resolve_cik(ticker)
     filings = await _get_8k_filings(cik, start_date, end_date)
@@ -226,86 +242,133 @@ async def ingest_8k_transcripts(
             )
             continue
 
-        try:
-            exhibits = await _get_exhibit_documents(cik, accession_no)
-        except EdgarFetchError as exc:
-            logger.error(
-                "8-K index fetch failed",
-                extra={"ticker": ticker, "accession_no": accession_no, "status": exc.final_status},
-            )
-            accession_path = accession_no.replace("-", "")
+        # ── Cache check ───────────────────────────────────────────────────────
+        _lock = await _get_transcript_lock(ticker, quarter)
+        async with _lock:
+            cached = await get_cached_transcript(ticker, quarter)
+            if cached:
+                logger.info(
+                    "transcript cache hit",
+                    extra={
+                        "ticker": ticker,
+                        "quarter": quarter,
+                        "filing_date": filing_date,
+                        "cache_hit": True,
+                    },
+                )
+                results.append(TranscriptResult(
+                    ticker=cached["ticker"],
+                    quarter=cached["quarter"],
+                    filing_date=cached["filing_date"],
+                    raw_text=cached["raw_text"],
+                    filing_url=cached["filing_url"],
+                    parse_status=cached["parse_status"],
+                ))
+                transcripts_extracted += 1
+                continue
+
+            # ── Cache miss: proceed with EDGAR fetch ──────────────────────────
+            filing_fetch_start = time.monotonic()
+
+            try:
+                exhibits = await _get_exhibit_documents(cik, accession_no)
+            except EdgarFetchError as exc:
+                logger.error(
+                    "8-K index fetch failed",
+                    extra={"ticker": ticker, "accession_no": accession_no, "status": exc.final_status},
+                )
+                accession_path = accession_no.replace("-", "")
+                results.append(TranscriptResult(
+                    ticker=ticker,
+                    quarter=quarter,
+                    filing_date=filing_date,
+                    raw_text="",
+                    filing_url=(
+                        f"https://www.sec.gov/Archives/edgar/data/{str(int(cik))}"
+                        f"/{accession_path}/{accession_no}-index.htm"
+                    ),
+                    parse_status="FETCH_ERROR",
+                ))
+                fetch_errors += 1
+                continue
+
+            if not exhibits:
+                logger.info(
+                    "8-K filing skipped",
+                    extra={"ticker": ticker, "filing_date": filing_date, "skip_reason": "NO_TRANSCRIPT"},
+                )
+                skipped_no_transcript += 1
+                continue
+
+            # Score all exhibits and pick the best-scoring transcript
+            best_text: str | None = None
+            best_status: ParseStatus = "NO_TRANSCRIPT"
+            best_url = exhibits[0]["url"]
+
+            for exhibit in exhibits:
+                try:
+                    text, status = await _extract_transcript_text(exhibit["url"], ticker, filing_date)
+                except EdgarFetchError as exc:
+                    logger.error(
+                        "8-K exhibit fetch failed",
+                        extra={"ticker": ticker, "url": exhibit["url"], "status": exc.final_status},
+                    )
+                    best_status = "FETCH_ERROR"
+                    best_url = exhibit["url"]
+                    continue
+                if status == "SUCCESS":
+                    best_text = text
+                    best_status = "SUCCESS"
+                    best_url = exhibit["url"]
+                    break  # first passing transcript wins
+                elif status == "PARSE_FAILURE":
+                    best_status = "PARSE_FAILURE"
+                    best_url = exhibit["url"]
+
+            if best_status == "SUCCESS":
+                transcripts_extracted += 1
+            elif best_status == "NO_TRANSCRIPT":
+                logger.info(
+                    "8-K filing skipped",
+                    extra={"ticker": ticker, "filing_url": best_url, "filing_date": filing_date, "skip_reason": "NO_TRANSCRIPT"},
+                )
+                skipped_no_transcript += 1
+            elif best_status == "PARSE_FAILURE":
+                logger.error(
+                    "8-K parse failure",
+                    extra={"ticker": ticker, "filing_url": best_url},
+                )
+                parse_failures += 1
+            elif best_status == "FETCH_ERROR":
+                fetch_errors += 1
+
             results.append(TranscriptResult(
                 ticker=ticker,
                 quarter=quarter,
                 filing_date=filing_date,
-                raw_text="",
-                filing_url=(
-                    f"https://www.sec.gov/Archives/edgar/data/{str(int(cik))}"
-                    f"/{accession_path}/{accession_no}-index.htm"
-                ),
-                parse_status="FETCH_ERROR",
+                raw_text=best_text or "",
+                filing_url=best_url,
+                parse_status=best_status,
             ))
-            fetch_errors += 1
-            continue
 
-        if not exhibits:
-            logger.info(
-                "8-K filing skipped",
-                extra={"ticker": ticker, "filing_date": filing_date, "skip_reason": "NO_TRANSCRIPT"},
-            )
-            skipped_no_transcript += 1
-            continue
-
-        # Score all exhibits and pick the best-scoring transcript
-        best_text: str | None = None
-        best_status: ParseStatus = "NO_TRANSCRIPT"
-        best_url = exhibits[0]["url"]
-
-        for exhibit in exhibits:
-            try:
-                text, status = await _extract_transcript_text(exhibit["url"], ticker, filing_date)
-            except EdgarFetchError as exc:
-                logger.error(
-                    "8-K exhibit fetch failed",
-                    extra={"ticker": ticker, "url": exhibit["url"], "status": exc.final_status},
+            if best_status == "SUCCESS":
+                await insert_transcript(
+                    ticker=ticker,
+                    quarter=quarter,
+                    filing_date=filing_date,
+                    raw_text=best_text or "",
+                    filing_url=best_url,
+                    parse_status=best_status,
                 )
-                best_status = "FETCH_ERROR"
-                best_url = exhibit["url"]
-                continue
-            if status == "SUCCESS":
-                best_text = text
-                best_status = "SUCCESS"
-                best_url = exhibit["url"]
-                break  # first passing transcript wins
-            elif status == "PARSE_FAILURE":
-                best_status = "PARSE_FAILURE"
-                best_url = exhibit["url"]
-
-        if best_status == "SUCCESS":
-            transcripts_extracted += 1
-        elif best_status == "NO_TRANSCRIPT":
-            logger.info(
-                "8-K filing skipped",
-                extra={"ticker": ticker, "filing_url": best_url, "filing_date": filing_date, "skip_reason": "NO_TRANSCRIPT"},
-            )
-            skipped_no_transcript += 1
-        elif best_status == "PARSE_FAILURE":
-            logger.error(
-                "8-K parse failure",
-                extra={"ticker": ticker, "filing_url": best_url},
-            )
-            parse_failures += 1
-        elif best_status == "FETCH_ERROR":
-            fetch_errors += 1
-
-        results.append(TranscriptResult(
-            ticker=ticker,
-            quarter=quarter,
-            filing_date=filing_date,
-            raw_text=best_text or "",
-            filing_url=best_url,
-            parse_status=best_status,
-        ))
+                logger.info(
+                    "transcript cache miss — EDGAR fetch complete",
+                    extra={
+                        "ticker": ticker,
+                        "quarter": quarter,
+                        "cache_hit": False,
+                        "fetch_duration_ms": int((time.monotonic() - filing_fetch_start) * 1000),
+                    },
+                )
 
     summary = IngestionSummary(
         ticker=ticker,
