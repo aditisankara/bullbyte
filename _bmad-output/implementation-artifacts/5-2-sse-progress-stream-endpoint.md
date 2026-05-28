@@ -1,6 +1,6 @@
 # Story 5.2: SSE Progress Stream Endpoint
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -29,25 +29,26 @@ So that the Angular frontend can display a live step-by-step feed while a fresh 
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Canonical payload `dto/progress-event.dto.ts` (AC2)
-  - [ ] `ProgressEvent` interface + `SSE_EVENTS` (kebab-case) union + `TERMINAL_EVENTS`
+- [x] Task 1: Canonical payload `dto/progress-event.dto.ts` (AC2)
+  - [x] `ProgressEvent` interface + `SSE_EVENTS` (kebab-case) union + `TERMINAL_EVENTS`
   - [ ] **SP3:** this shape is the shared contract with FastAPI — lock it with Dev 1 before 5.3 codes against it
+        _(shape defined; cross-team sign-off with Dev 1 still pending — flag on the 5.3 handoff)_
 
-- [ ] Task 2: `ProgressService` (`progress.service.ts`) (AC3, AC4, AC5)
-  - [ ] One multicast `Subject<ProgressEvent>` per active `jobId` (Map) → all clients for a job share it (AC5)
-  - [ ] `publish(event)` — push to the job's subject; complete + drop on a terminal event (AC3). Called by the 5.3 webhook relay
-  - [ ] `stream(jobId)` — if the job is already terminal in the DB, emit the terminal event once and close (AC4); else stream live until terminal
+- [x] Task 2: `ProgressService` (`progress.service.ts`) (AC3, AC4, AC5)
+  - [x] One multicast `Subject<ProgressEvent>` per active `jobId` (Map) → all clients for a job share it (AC5)
+  - [x] `publish(event)` — push to the job's subject; complete + drop on a terminal event (AC3). Called by the 5.3 webhook relay
+  - [x] `stream(jobId)` — if the job is already terminal in the DB, emit the terminal event once and close (AC4); else stream live until terminal
 
-- [ ] Task 3: `JobsProgressController` (`jobs-progress.controller.ts`) (AC1)
-  - [ ] `@Sse(':jobId/progress')` on `@Controller('jobs')` → `/api/v1/jobs/:jobId/progress`, returns `Observable<MessageEvent>`
-  - [ ] NestJS `@Sse()` sets the `text/event-stream` + no-cache headers automatically
+- [x] Task 3: `JobsProgressController` (`jobs-progress.controller.ts`) (AC1)
+  - [x] `@Sse(':jobId/progress')` on `@Controller('jobs')` → `/api/v1/jobs/:jobId/progress`, returns `Observable<MessageEvent>`
+  - [x] NestJS `@Sse()` sets the `text/event-stream` + no-cache headers automatically
 
-- [ ] Task 4: Register in `JobsModule`
-  - [ ] Add `JobsProgressController` + `ProgressService`; **export `ProgressService`** so the 5.3 webhook module can call `publish()`
+- [x] Task 4: Register in `JobsModule`
+  - [x] Add `JobsProgressController` + `ProgressService`; **export `ProgressService`** so the 5.3 webhook module can call `publish()`
 
-- [ ] Task 5: Tests
-  - [ ] `progress.service.spec.ts`: `publish` fans out to all subscribers (AC5); terminal event completes the stream (AC3); already-terminal job emits once + completes (AC4)
-  - [ ] (e2e) optional: connect with `Accept: text/event-stream`, assert headers + an event frame
+- [x] Task 5: Tests
+  - [x] `progress.service.spec.ts`: `publish` fans out to all subscribers (AC5); terminal event delivers then completes + drops late events (AC3); already-terminal COMPLETED/FAILED job emits once + completes (AC4); publish with no listener is a no-op
+  - [ ] (e2e) optional: connect with `Accept: text/event-stream`, assert headers + an event frame — _not done (optional)_
 
 ## Dev Notes
 
@@ -74,15 +75,20 @@ NestJS `@Sse()` expects `Observable<MessageEvent>` (`{ data, type?, id?, retry? 
 
 ## Dev Agent Record
 ### Agent Model Used
-(scaffold authored by claude-opus-4-7; implementation TBD)
+claude-opus-4-7 (scaffold + implementation)
 ### Completion Notes List
-- Scaffold only: SSE controller + ProgressService (publish/stream) created; tests (Task 5) pending; 5.3 webhook will drive publish().
+- SSE transport + `ProgressService.publish()` seam complete. `publish()` will be driven by the 5.3 FastAPI→NestJS webhook relay; until then the already-terminal path (AC4) and unit-level fan-out (AC5) are the exercisable paths.
+- Task 5 tests added: `progress.service.spec.ts` covers multicast fan-out (AC5), terminal-delivers-then-completes + late-event drop (AC3), already-terminal COMPLETED/FAILED short-circuit (AC4), and the no-listener no-op.
+- `npx jest` green; `nest build` clean; `eslint` 0 errors (only the project-standard `no-unsafe-argument` test-mock warning).
+- Open: SP3 SSE/webhook payload shape still needs joint sign-off with Dev 1 before 5.3 codes against it.
 ### File List
 - _bmad-output/implementation-artifacts/5-2-sse-progress-stream-endpoint.md
 - api/src/jobs/dto/progress-event.dto.ts
 - api/src/jobs/progress.service.ts
+- api/src/jobs/progress.service.spec.ts (new)
 - api/src/jobs/jobs-progress.controller.ts
 - api/src/jobs/jobs.module.ts (modified)
 
 ## Change Log
 - 2026-05-27: Story drafted + SSE module scaffolded by claude-opus-4-7.
+- 2026-05-28: Implementation completed — ProgressService specs (AC3/AC4/AC5) added; story moved to review by claude-opus-4-7.

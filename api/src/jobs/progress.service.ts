@@ -57,7 +57,9 @@ export class ProgressService {
 		return subject;
 	}
 
-	private async terminalSnapshot(jobId: string): Promise<ProgressEvent | null> {
+	private async terminalSnapshot(
+		jobId: string
+	): Promise<ProgressEvent | null> {
 		const [job] = await this.db
 			.select({ status: analysisJobs.status })
 			.from(analysisJobs)

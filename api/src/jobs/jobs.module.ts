@@ -18,7 +18,12 @@ import { MlSidecarService } from '../common/ml-sidecar.service';
 		HttpModule,
 	],
 	controllers: [JobsController, JobsProgressController],
-	providers: [JobsService, ProgressService, AnalysisProcessor, MlSidecarService],
+	providers: [
+		JobsService,
+		ProgressService,
+		AnalysisProcessor,
+		MlSidecarService,
+	],
 	// ProgressService is exported so the 5.3 webhook relay can call publish().
 	exports: [ProgressService],
 })
