@@ -54,6 +54,10 @@
   --gold-2:       #B88A22;   /* gold pressed/hover               */
   --gold-tint:    rgba(212, 165, 55, 0.12);
 
+  /* Brand roles (semantic aliases — reference these by role in specs) */
+  --brand-primary:    var(--ink);    /* primary brand / primary text */
+  --brand-secondary:  var(--gold);   /* accent, used sparingly        */
+
   /* Verdict semantics — the workhorse palette */
   --verdict-delivered:      #2F7D5B;
   --verdict-delivered-bg:   #E4EFE9;
@@ -71,6 +75,13 @@
   --verdict-revised-bg:     #E8E1F1;
   --verdict-revised-ink:    #4A356B;
 
+  /* INSUFFICIENT_DATA — neutral slate; not enough actuals to verify yet.
+     Deliberately desaturated so it never reads as a "soft pass/fail".
+     Contrast (bg #E8EAEE on ink #3C4658) ≈ 7.9:1 → WCAG AA (NFR22). */
+  --verdict-insufficient:     #5C6B82;
+  --verdict-insufficient-bg:  #E8EAEE;
+  --verdict-insufficient-ink: #3C4658;
+
   /* Data viz neutrals (timeline grid, sparklines) */
   --data-grid:    #DDD6C7;
   --data-axis:    #5C6B82;
@@ -83,7 +94,12 @@
   --font-sans:     'Inter Tight', 'Söhne', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
   --font-mono:     'JetBrains Mono', 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
 
-  /* Type scale — 1.2 ratio, 16px base */
+  /* Type scale — 1.2 ratio, 16px base.
+     Decision (Story 2.1): sizes stay in px (matches the design source); the
+     16px html root keeps them rem-equivalent and they scale with user zoom.
+     Per-level weight + line-height are applied via the element styles below
+     (h1–h6, p, .display-number, .pull-quote) rather than bundled per token —
+     that mapping IS the named-type-style spec for 2.1. */
   --text-xs:       12px;     /* meta, captions, table micro */
   --text-sm:       14px;     /* secondary body, dense tables */
   --text-base:     16px;     /* body                         */
@@ -208,6 +224,10 @@
   --verdict-revised:        #9277C0;
   --verdict-revised-bg:     rgba(146, 119, 192, 0.14);
   --verdict-revised-ink:    #B19DD2;
+
+  --verdict-insufficient:     #8A95A8;
+  --verdict-insufficient-bg:  rgba(138, 149, 168, 0.14);
+  --verdict-insufficient-ink: #AEB7C6;
 
   --data-grid:    #2A364A;
   --data-axis:    #98A1B3;
