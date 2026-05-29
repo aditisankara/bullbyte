@@ -33,3 +33,42 @@ export interface QuarterColumn {
   quarter: string;
   verdicts: Verdict[];
 }
+
+/** A reference to a source filing on SEC EDGAR (FR38). */
+export interface FilingRef {
+  /** Filing type, e.g. "8-K", "10-K". */
+  type: string;
+  /** Quarter the filing pertains to, e.g. "Q1 2024". */
+  quarter: string;
+  /** Direct EDGAR URL. */
+  url: string;
+}
+
+/**
+ * One ordered step of the agent reasoning trace (FR39). `citation` is the
+ * inline EDGAR (or other source) link backing this step's result. Aligns with
+ * the reasoning-trace output landing in Stories 4.5 / 5.5.
+ */
+export interface TraceStep {
+  tool: string;
+  args: string;
+  result: string;
+  citation?: { label: string; url: string };
+}
+
+/**
+ * Full detail for a single claim, shown in the ClaimDetailPanel. Extends the
+ * card summary with the claimed→actual values, the source filings, and the
+ * reasoning trace.
+ */
+export interface ClaimDetail extends ClaimSummary {
+  /** The value the executive claimed, e.g. "620M". */
+  claimed: string;
+  /** What actually happened, e.g. "602M". */
+  actual: string;
+  /** EDGAR filing the claim was sourced from. */
+  filing: FilingRef;
+  /** EDGAR filing the actual was verified against. */
+  actualFiling: FilingRef;
+  trace: TraceStep[];
+}
