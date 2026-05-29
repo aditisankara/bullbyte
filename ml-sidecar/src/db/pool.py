@@ -1,11 +1,29 @@
 """asyncpg connection pool — single authority for all DB connections in the sidecar."""
 
 import asyncio
+import json
 import os
 import asyncpg
 
 _pool: asyncpg.Pool | None = None
 _pool_lock = asyncio.Lock()
+
+
+async def _init_connection(conn: asyncpg.Connection) -> None:
+    # asyncpg returns json/jsonb as raw strings by default; register codecs so
+    # all queries in the codebase get Python-native dicts/lists automatically.
+    await conn.set_type_codec(
+        "jsonb",
+        encoder=json.dumps,
+        decoder=json.loads,
+        schema="pg_catalog",
+    )
+    await conn.set_type_codec(
+        "json",
+        encoder=json.dumps,
+        decoder=json.loads,
+        schema="pg_catalog",
+    )
 
 
 async def get_pool() -> asyncpg.Pool:
@@ -25,6 +43,7 @@ async def get_pool() -> asyncpg.Pool:
                     ),
                     min_size=2,
                     max_size=10,
+                    init=_init_connection,
                 )
     return _pool
 

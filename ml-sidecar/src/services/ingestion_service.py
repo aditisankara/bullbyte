@@ -264,7 +264,8 @@ async def ingest_8k_transcripts(
                     filing_url=cached["filing_url"],
                     parse_status=cached["parse_status"],
                 ))
-                transcripts_extracted += 1
+                if cached["parse_status"] == "SUCCESS":
+                    transcripts_extracted += 1
                 continue
 
             # ── Cache miss: proceed with EDGAR fetch ──────────────────────────
@@ -290,6 +291,15 @@ async def ingest_8k_transcripts(
                     parse_status="FETCH_ERROR",
                 ))
                 fetch_errors += 1
+                logger.info(
+                    "transcript cache miss — EDGAR fetch complete",
+                    extra={
+                        "ticker": ticker,
+                        "quarter": quarter,
+                        "cache_hit": False,
+                        "fetch_duration_ms": int((time.monotonic() - filing_fetch_start) * 1000),
+                    },
+                )
                 continue
 
             if not exhibits:
@@ -298,6 +308,15 @@ async def ingest_8k_transcripts(
                     extra={"ticker": ticker, "filing_date": filing_date, "skip_reason": "NO_TRANSCRIPT"},
                 )
                 skipped_no_transcript += 1
+                logger.info(
+                    "transcript cache miss — EDGAR fetch complete",
+                    extra={
+                        "ticker": ticker,
+                        "quarter": quarter,
+                        "cache_hit": False,
+                        "fetch_duration_ms": int((time.monotonic() - filing_fetch_start) * 1000),
+                    },
+                )
                 continue
 
             # Score all exhibits and pick the best-scoring transcript
@@ -360,15 +379,16 @@ async def ingest_8k_transcripts(
                     filing_url=best_url,
                     parse_status=best_status,
                 )
-                logger.info(
-                    "transcript cache miss — EDGAR fetch complete",
-                    extra={
-                        "ticker": ticker,
-                        "quarter": quarter,
-                        "cache_hit": False,
-                        "fetch_duration_ms": int((time.monotonic() - filing_fetch_start) * 1000),
-                    },
-                )
+
+            logger.info(
+                "transcript cache miss — EDGAR fetch complete",
+                extra={
+                    "ticker": ticker,
+                    "quarter": quarter,
+                    "cache_hit": False,
+                    "fetch_duration_ms": int((time.monotonic() - filing_fetch_start) * 1000),
+                },
+            )
 
     summary = IngestionSummary(
         ticker=ticker,

@@ -448,12 +448,9 @@ def _collect_submission_entries(recent: dict) -> list[dict]:
 # ── Task 9: Top-level orchestrator ────────────────────────────────────────────
 
 def _reconstruct_financials_result(row: asyncpg.Record) -> FinancialsResult:
-    """Reconstruct a FinancialsResult from a cached financial_actuals DB row.
-
-    asyncpg returns JSONB columns as native Python objects (list[dict]) —
-    no json.loads() needed.
-    """
-    metrics_data: list[dict] = row["metrics"] or []
+    """Reconstruct a FinancialsResult from a cached financial_actuals DB row."""
+    raw = row["metrics"]
+    metrics_data: list[dict] = json.loads(raw) if isinstance(raw, str) else (raw or [])
     metrics = [FinancialMetric(**m) for m in metrics_data]
     return FinancialsResult(
         ticker=row["ticker"],

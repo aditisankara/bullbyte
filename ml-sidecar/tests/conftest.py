@@ -1,3 +1,4 @@
+import asyncio
 import os
 from unittest.mock import AsyncMock, MagicMock
 
@@ -40,23 +41,29 @@ def _mock_db_cache(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _reset_lock_registries():
-    """Clear per-(ticker, quarter) asyncio lock dicts before and after each test.
+    """Clear per-(ticker, quarter) asyncio lock dicts and meta-locks before and after each test.
 
     asyncio.Lock objects are bound to the event loop they were first awaited in.
     pytest-asyncio creates a fresh event loop per test, so stale locks from a
     previous test must be cleared to prevent 'Future attached to a different
-    loop' errors.
+    loop' errors.  This includes the meta-locks (_TRANSCRIPT_CACHE_LOCKS_META,
+    _FINANCIALS_CACHE_LOCKS_META) which were previously left unreset and could
+    carry state from a dead event loop into the next test.
     """
     import src.services.ingestion_service as ingestion_svc
     import src.services.financials_service as financials_svc
 
     ingestion_svc._TICKER_CIK_MAP = {}
     ingestion_svc._TRANSCRIPT_CACHE_LOCKS = {}
+    ingestion_svc._TRANSCRIPT_CACHE_LOCKS_META = asyncio.Lock()
     financials_svc._FINANCIALS_CACHE_LOCKS = {}
+    financials_svc._FINANCIALS_CACHE_LOCKS_META = asyncio.Lock()
     yield
     ingestion_svc._TICKER_CIK_MAP = {}
     ingestion_svc._TRANSCRIPT_CACHE_LOCKS = {}
+    ingestion_svc._TRANSCRIPT_CACHE_LOCKS_META = asyncio.Lock()
     financials_svc._FINANCIALS_CACHE_LOCKS = {}
+    financials_svc._FINANCIALS_CACHE_LOCKS_META = asyncio.Lock()
 
 
 @pytest.fixture

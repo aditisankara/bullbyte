@@ -333,3 +333,38 @@ async def test_financials_fetch_error_not_persisted():
 
     assert result.status == "FETCH_ERROR"
     mock_insert.assert_not_called()
+
+
+async def test_financials_filing_not_yet_available_not_persisted():
+    """FILING_NOT_YET_AVAILABLE result must NOT be inserted into the financials cache."""
+    with patch("src.services.financials_service.get_cached_financial_actuals",
+               new_callable=AsyncMock, return_value=None), \
+         patch("src.services.financials_service.insert_financial_actuals",
+               new_callable=AsyncMock) as mock_insert, \
+         patch("src.services.financials_service.resolve_cik",
+               new_callable=AsyncMock, return_value="0001318605"), \
+         patch("src.services.financials_service._find_filing_accession",
+               new_callable=AsyncMock, return_value=None):
+        result = await ingest_financial_actuals("TSLA", "Q3-2024")
+
+    assert result.status == "FILING_NOT_YET_AVAILABLE"
+    mock_insert.assert_not_called()
+
+
+async def test_transcript_no_transcript_not_persisted():
+    """Filing with no transcript exhibits (NO_TRANSCRIPT) must NOT call insert_transcript."""
+    with patch("src.services.ingestion_service.get_cached_transcript",
+               new_callable=AsyncMock, return_value=None), \
+         patch("src.services.ingestion_service.insert_transcript",
+               new_callable=AsyncMock) as mock_insert, \
+         patch("src.services.ingestion_service.resolve_cik",
+               new_callable=AsyncMock, return_value="0001318605"), \
+         patch("src.services.ingestion_service._get_8k_filings",
+               new_callable=AsyncMock,
+               return_value=[{"accession_no": "0001318605-24-000123", "filing_date": "2024-10-23"}]), \
+         patch("src.services.ingestion_service._get_exhibit_documents",
+               new_callable=AsyncMock, return_value=[]):
+        summary = await ingest_8k_transcripts("TSLA", "2024-10-01", "2024-10-31")
+
+    mock_insert.assert_not_called()
+    assert summary.transcripts_extracted == 0

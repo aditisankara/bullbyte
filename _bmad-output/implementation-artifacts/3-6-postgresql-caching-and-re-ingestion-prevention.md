@@ -1,6 +1,6 @@
 # Story 3.6: PostgreSQL Caching & Re-ingestion Prevention
 
-Status: review
+Status: done
 
 ## Story
 
@@ -731,11 +731,11 @@ None — implementation went cleanly without debugging detours.
 
 ### Review Findings
 
-- [ ] [Review][Patch] `_reset_lock_registries` does not clear `_TRANSCRIPT_CACHE_LOCKS_META` / `_FINANCIALS_CACHE_LOCKS_META` — stale meta-locks survive across pytest function-scoped event loops [ml-sidecar/tests/conftest.py]
-- [ ] [Review][Patch] `cache_hit: false` log only emitted on `best_status == "SUCCESS"` in `ingest_8k_transcripts` — AC2 requires the log on all cache-miss paths (PARSE_FAILURE, FETCH_ERROR, NO_TRANSCRIPT also hit EDGAR) [ml-sidecar/src/services/ingestion_service.py]
-- [ ] [Review][Patch] Missing test: `FILING_NOT_YET_AVAILABLE` financials result must not be persisted — spec Task 6 lists this as a distinct required test case, only FETCH_ERROR is covered [ml-sidecar/tests/test_caching.py]
-- [ ] [Review][Patch] Missing test: `NO_TRANSCRIPT` transcript result must not be persisted — spec Task 6 requires non-SUCCESS transcript tests beyond PARSE_FAILURE [ml-sidecar/tests/test_caching.py]
-- [ ] [Review][Patch] Cache-hit path unconditionally increments `transcripts_extracted` even when `cached["parse_status"] != "SUCCESS"` — asymmetric with non-cache path which guards on `best_status == "SUCCESS"` [ml-sidecar/src/services/ingestion_service.py]
+- [x] [Review][Patch] `_reset_lock_registries` does not clear `_TRANSCRIPT_CACHE_LOCKS_META` / `_FINANCIALS_CACHE_LOCKS_META` — stale meta-locks survive across pytest function-scoped event loops [ml-sidecar/tests/conftest.py]
+- [x] [Review][Patch] `cache_hit: false` log only emitted on `best_status == "SUCCESS"` in `ingest_8k_transcripts` — AC2 requires the log on all cache-miss paths (PARSE_FAILURE, FETCH_ERROR, NO_TRANSCRIPT also hit EDGAR) [ml-sidecar/src/services/ingestion_service.py]
+- [x] [Review][Patch] Missing test: `FILING_NOT_YET_AVAILABLE` financials result must not be persisted — spec Task 6 lists this as a distinct required test case, only FETCH_ERROR is covered [ml-sidecar/tests/test_caching.py]
+- [x] [Review][Patch] Missing test: `NO_TRANSCRIPT` transcript result must not be persisted — spec Task 6 requires non-SUCCESS transcript tests beyond PARSE_FAILURE [ml-sidecar/tests/test_caching.py]
+- [x] [Review][Patch] Cache-hit path unconditionally increments `transcripts_extracted` even when `cached["parse_status"] != "SUCCESS"` — asymmetric with non-cache path which guards on `best_status == "SUCCESS"` [ml-sidecar/src/services/ingestion_service.py]
 - [x] [Review][Defer] `_reconstruct_financials_result` raises uncaught `ValidationError` if DB JSONB row has schema not matching current `FinancialMetric` — pre-existing future risk; handle in a schema-evolution story [ml-sidecar/src/services/financials_service.py] — deferred, pre-existing
 - [x] [Review][Defer] `PARTIAL` financials cached permanently with no invalidation mechanism — SUCCESS data from a later EDGAR fetch is never used once PARTIAL is stored; deliberate spec choice, revisit with TTL story [ml-sidecar/src/db/queries.py] — deferred, pre-existing
 - [x] [Review][Defer] `fetch_duration_ms` in financials cache-miss log includes fast-path DB check and lock wait, not only EDGAR fetch — misleading for performance monitoring; fix label or move `start_time` in a future observability story [ml-sidecar/src/services/financials_service.py] — deferred, pre-existing
