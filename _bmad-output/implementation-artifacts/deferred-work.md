@@ -53,23 +53,24 @@
 - `EdgarFetchLog` Pydantic model is defined but never used in the logging path — spec requires its definition; wire it to enforce the log schema in a future observability story
 - No production shutdown hook for `await client._http_client.aclose()` on FastAPI app teardown — requires touching `src/main.py`; address in a production hardening story alongside other lifecycle hooks
 
-## Transcript coverage gap — revisit before Epic 4 if claim extraction yield is low (2026-05-26)
+## Transcript source decisions and Finnhub upgrade path (2026-05-29)
 
-EDGAR 8-K filings rarely include a full earnings call transcript as EX-99. Most only contain
-the earnings press release (EX-99.1), which has forward-looking language but not the CEO's
-spoken remarks verbatim. If claim extraction yield in Epic 4 is too low to be useful, consider:
+**Implemented (story 3.7):** EX-99.1 press releases accepted as `PRESS_RELEASE`-status fallback
+transcripts when no full earnings call transcript is found. Keyword scorer now uses tiered thresholds:
+score ≥ 3 → `SUCCESS`, score 1–2 → `PRESS_RELEASE`, score 0 → `NO_TRANSCRIPT`.
 
-1. **Include EX-99.1 press releases as a claims source** — already fetched by the pipeline,
-   just filtered out by the keyword scorer. Forward-guidance language is rich enough for LLM
-   claim extraction even without the spoken-call format. Lowest effort.
-2. **Seek Alpha transcripts** — structured HTML, near-100% coverage of public companies.
-   Legally grey; evaluate before building.
-3. **Earnings call audio + OpenAI Whisper (OSS speech-to-text)** — fetch webcast audio URL
-   from the 8-K filing, transcribe locally. Full fidelity but operationally heavy (large audio
-   files, GPU recommended, speaker diarization needed for CEO attribution).
+**Finnhub — viable paid upgrade when full transcript fidelity is required:**
+- API: `GET /api/v1/stock/transcripts` — verbatim spoken-word earnings call transcripts
+- Coverage: ~80% of large/mid-cap US companies; near-100% for S&P 500
+- Pricing: Premium tier required (~$130–200/month); free tier does NOT include transcripts
+- Legal risk: LOW — licensed commercial data with proper ToS (unlike Seeking Alpha scraping)
+- Integration: drop-in — same pipeline architecture, different source URL in exhibit fetcher
+- When to upgrade: if Epic 4 extraction_confidence scores are systematically lower for
+  `PRESS_RELEASE` rows than `SUCCESS` rows, Finnhub closes that fidelity gap cleanly
 
-The pipeline architecture (CIK resolution → filing discovery → exhibit scoring → text extraction)
-is reusable for any of the above; only the source URL and keyword scorer threshold change.
+**Options ruled out:**
+- Seeking Alpha scraping — legally grey (copyright), risk of DMCA/IP block; do not build
+- Earnings call audio + Whisper — GPU required, speaker diarization needed, 2–3 week project; last resort only
 
 ## Deferred from: code review of 3-2-8-k-earnings-call-transcript-ingestion-and-parsing (2026-05-26)
 
