@@ -88,7 +88,7 @@ development_status:
 
   2-1-design-token-system: review                     # token gaps closed; all 5 verdict pairs verified AA
   2-2-core-shared-component-specs: review             # 4 shared components + tests; suite 24/24 green
-  2-3-search-page-and-analysis-progress-feed-specs: ready-for-dev  # after 2.2
+  2-3-search-page-and-analysis-progress-feed-specs: review  # SearchInput + AnalysisProgressFeed + SSE mirror; 38/38 green
   2-4-promise-timeline-and-claim-card-specs: ready-for-dev  # after 2.2
   2-5-claim-detail-panel-and-reasoning-trace-specs: ready-for-dev  # after 2.2
   2-6-ceo-score-card-and-responsive-layout-specs: ready-for-dev    # caps Epic 2; needed by Epic 6
