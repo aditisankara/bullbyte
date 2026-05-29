@@ -91,7 +91,7 @@ development_status:
   2-3-search-page-and-analysis-progress-feed-specs: review  # SearchInput + AnalysisProgressFeed + SSE mirror; 38/38 green
   2-4-promise-timeline-and-claim-card-specs: review  # PromiseTimeline + ClaimCard + breakpoints; 52/52 green
   2-5-claim-detail-panel-and-reasoning-trace-specs: review  # ClaimDetailPanel + ReasoningTrace; 62/62 green
-  2-6-ceo-score-card-and-responsive-layout-specs: ready-for-dev    # caps Epic 2; needed by Epic 6
+  2-6-ceo-score-card-and-responsive-layout-specs: review    # CeoScoreCard + CompanyPageLayout + capstone matrix; 72/72 green
 
   epic-2-retrospective: optional
 
