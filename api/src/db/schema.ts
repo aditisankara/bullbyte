@@ -169,7 +169,7 @@ export const transcripts = pgTable(
 		filingDate: text('filing_date').notNull(),
 		rawText: text('raw_text').notNull(),
 		filingUrl: text('filing_url').notNull(),
-		parseStatus: text('parse_status').notNull(),  // always "SUCCESS" when cached
+		parseStatus: text('parse_status').notNull(),  // "SUCCESS" or "PRESS_RELEASE" when cached
 		ingestedAt: timestamp('ingested_at', { withTimezone: true })
 			.defaultNow()
 			.notNull(),

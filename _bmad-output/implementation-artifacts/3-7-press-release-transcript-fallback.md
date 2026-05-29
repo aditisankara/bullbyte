@@ -1,6 +1,6 @@
 # Story 3.7: Press Release Transcript Fallback
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -38,14 +38,14 @@ So that Epic 4 claim extraction has real financial-guidance text for every compa
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Extend `ParseStatus` in `ml-sidecar/src/models/ingestion_models.py` (AC: 1, 2, 3)
-  - [ ] Add `"PRESS_RELEASE"` to the `ParseStatus` Literal — new value: `Literal["SUCCESS", "PRESS_RELEASE", "PARSE_FAILURE", "NO_TRANSCRIPT", "FETCH_ERROR"]`
-  - [ ] Add `press_releases_extracted: int` field to `IngestionSummary` (after `transcripts_extracted`, before `skipped_no_transcript`)
-  - [ ] Default value is `0` — no other callers need updating
+- [x] Task 1: Extend `ParseStatus` in `ml-sidecar/src/models/ingestion_models.py` (AC: 1, 2, 3)
+  - [x] Add `"PRESS_RELEASE"` to the `ParseStatus` Literal — new value: `Literal["SUCCESS", "PRESS_RELEASE", "PARSE_FAILURE", "NO_TRANSCRIPT", "FETCH_ERROR"]`
+  - [x] Add `press_releases_extracted: int` field to `IngestionSummary` (after `transcripts_extracted`, before `skipped_no_transcript`)
+  - [x] Default value is `0` — no other callers need updating
 
-- [ ] Task 2: Update keyword scorer in `_extract_transcript_text` (AC: 1, 2)
-  - [ ] Current logic: `if score < 3: return None, "NO_TRANSCRIPT"`
-  - [ ] New logic (exact replacement):
+- [x] Task 2: Update keyword scorer in `_extract_transcript_text` (AC: 1, 2)
+  - [x] Current logic: `if score < 3: return None, "NO_TRANSCRIPT"`
+  - [x] New logic (exact replacement):
     ```python
     if score >= 3:
         pass  # fall through to extract
@@ -57,11 +57,11 @@ So that Epic 4 claim extraction has real financial-guidance text for every compa
     else:
         return None, "NO_TRANSCRIPT"
     ```
-  - [ ] The `SUCCESS` path below is unchanged — reaching it means `score >= 3`
+  - [x] The `SUCCESS` path below is unchanged — reaching it means `score >= 3`
 
-- [ ] Task 3: Update cache persist and counter logic in `ingest_8k_transcripts` (AC: 3, 4)
-  - [ ] Add `press_releases_extracted = 0` counter initialisation alongside `transcripts_extracted = 0`
-  - [ ] In the `best_status` branch block (currently lines ~347-363), add `PRESS_RELEASE` handling:
+- [x] Task 3: Update cache persist and counter logic in `ingest_8k_transcripts` (AC: 3, 4)
+  - [x] Add `press_releases_extracted = 0` counter initialisation alongside `transcripts_extracted = 0`
+  - [x] In the `best_status` branch block (currently lines ~347-363), add `PRESS_RELEASE` handling:
     ```python
     if best_status == "SUCCESS":
         transcripts_extracted += 1
@@ -74,22 +74,22 @@ So that Epic 4 claim extraction has real financial-guidance text for every compa
     elif best_status == "NO_TRANSCRIPT":
         ...  # unchanged
     ```
-  - [ ] Change cache persist condition from `if best_status == "SUCCESS":` to `if best_status in ("SUCCESS", "PRESS_RELEASE"):`
-  - [ ] Pass `press_releases_extracted=press_releases_extracted` to `IngestionSummary` constructor
+  - [x] Change cache persist condition from `if best_status == "SUCCESS":` to `if best_status in ("SUCCESS", "PRESS_RELEASE"):`
+  - [x] Pass `press_releases_extracted=press_releases_extracted` to `IngestionSummary` constructor
 
-- [ ] Task 4: Update `transcripts` schema comment in `api/src/db/schema.ts` (AC: 3)
-  - [ ] Change `parseStatus` comment from `// always "SUCCESS" when cached` to `// "SUCCESS" or "PRESS_RELEASE" when cached`
-  - [ ] No migration needed — column type is already `text`, no constraint on values
+- [x] Task 4: Update `transcripts` schema comment in `api/src/db/schema.ts` (AC: 3)
+  - [x] Change `parseStatus` comment from `// always "SUCCESS" when cached` to `// "SUCCESS" or "PRESS_RELEASE" when cached`
+  - [x] No migration needed — column type is already `text`, no constraint on values
 
-- [ ] Task 5: Update tests in `ml-sidecar/tests/test_ingestion.py` (AC: 1, 2, 3, 4)
-  - [ ] Add test: `test_low_score_exhibit_returns_press_release` — mock exhibit with score 1 keyword match, assert `(text, "PRESS_RELEASE")` returned
-  - [ ] Add test: `test_zero_score_exhibit_returns_no_transcript` — mock exhibit with 0 keyword matches, assert `(None, "NO_TRANSCRIPT")` returned
-  - [ ] Add test: `test_press_release_persisted_to_cache` — mock the full ingestion flow with a PRESS_RELEASE exhibit, assert `insert_transcript` called with `parse_status="PRESS_RELEASE"` and `press_releases_extracted == 1`
-  - [ ] Add test: `test_success_beats_press_release` — two exhibits: first scores PRESS_RELEASE, second scores SUCCESS, assert final result is SUCCESS (the break-on-success logic is unchanged)
-  - [ ] Verify all existing caching tests still pass (`test_caching.py`) — `_CACHED_TRANSCRIPT_ROW` uses `"SUCCESS"` which remains valid
+- [x] Task 5: Update tests in `ml-sidecar/tests/test_ingestion.py` (AC: 1, 2, 3, 4)
+  - [x] Add test: `test_low_score_exhibit_returns_press_release` — mock exhibit with score 1 keyword match, assert `(text, "PRESS_RELEASE")` returned
+  - [x] Add test: `test_zero_score_exhibit_returns_no_transcript` — mock exhibit with 0 keyword matches, assert `(None, "NO_TRANSCRIPT")` returned
+  - [x] Add test: `test_press_release_persisted_to_cache` — mock the full ingestion flow with a PRESS_RELEASE exhibit, assert `insert_transcript` called with `parse_status="PRESS_RELEASE"` and `press_releases_extracted == 1`
+  - [x] Add test: `test_success_beats_press_release` — two exhibits: first scores PRESS_RELEASE, second scores SUCCESS, assert final result is SUCCESS (the break-on-success logic is unchanged)
+  - [x] Verify all existing caching tests still pass (`test_caching.py`) — `_CACHED_TRANSCRIPT_ROW` uses `"SUCCESS"` which remains valid
 
-- [ ] Task 6: Update `deferred-work.md` (AC: 6)
-  - [ ] Replace the existing "Transcript coverage gap" section (lines ~56-70) with:
+- [x] Task 6: Update `deferred-work.md` (AC: 6)
+  - [x] Replace the existing "Transcript coverage gap" section (lines ~56-70) with:
     ```
     ## Transcript source: press releases implemented; Finnhub is the upgrade path
 
@@ -227,9 +227,24 @@ Epic 4's extraction prompt or pre-filter should handle both. Consider passing `s
 ### Agent Model Used
 
 claude-sonnet-4-6 (story creation via bmad-create-story, 2026-05-29)
+claude-sonnet-4-6 (implementation via bmad-dev-story, 2026-05-29)
 
 ### Debug Log References
 
 ### Completion Notes List
 
+- Added `"PRESS_RELEASE"` to `ParseStatus` Literal and `press_releases_extracted: int = 0` to `IngestionSummary`
+- Updated `_extract_transcript_text` with tiered scorer: score ≥3 → SUCCESS, 1–2 → PRESS_RELEASE, 0 → NO_TRANSCRIPT
+- Updated exhibit scoring loop to capture first PRESS_RELEASE as fallback; SUCCESS still breaks and wins
+- PARSE_FAILURE no longer overwrites a previously found PRESS_RELEASE (keeps the text)
+- Cache persist condition extended to `if best_status in ("SUCCESS", "PRESS_RELEASE")`
+- IngestionSummary constructor and completion log updated with `press_releases_extracted`
+- 4 new tests added; all 130 tests pass with zero regressions
+- `deferred-work.md` already contained the correct updated section from story creation
+
 ### File List
+
+- ml-sidecar/src/models/ingestion_models.py
+- ml-sidecar/src/services/ingestion_service.py
+- ml-sidecar/tests/test_ingestion.py
+- api/src/db/schema.ts

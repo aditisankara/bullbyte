@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 # Status of the parsing process for a given transcript
-ParseStatus = Literal["SUCCESS", "PARSE_FAILURE", "NO_TRANSCRIPT", "FETCH_ERROR"]
+ParseStatus = Literal["SUCCESS", "PRESS_RELEASE", "PARSE_FAILURE", "NO_TRANSCRIPT", "FETCH_ERROR"]
 
 class TranscriptResult(BaseModel):
     """Model representing the result of parsing a transcript."""
@@ -22,6 +22,7 @@ class IngestionSummary(BaseModel):
     date_range_end: str
     total_8k_found: int
     transcripts_extracted: int
+    press_releases_extracted: int = 0
     skipped_no_transcript: int
     parse_failures: int
     fetch_errors: int

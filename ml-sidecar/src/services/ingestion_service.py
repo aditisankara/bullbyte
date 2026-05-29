@@ -172,8 +172,16 @@ async def _extract_transcript_text(
         preview = response.text[:8000].lower()
         # Use a set to count unique keyword matches per spec (Task 6: "count unique keyword matches")
         score = len({kw for kw in _TRANSCRIPT_KEYWORDS if kw in preview})
-        if score < 3:
+        if score >= 3:
+            pass  # fall through to SUCCESS extraction below
+        elif score >= 1:
+            soup = BeautifulSoup(response.text, "lxml")
+            raw = soup.get_text(separator="\n", strip=True)
+            cleaned = re.sub(r"\n{3,}", "\n\n", raw)
+            return cleaned, "PRESS_RELEASE"
+        else:
             return None, "NO_TRANSCRIPT"
+        # SUCCESS path — reached only when score >= 3
         soup = BeautifulSoup(response.text, "lxml")
         raw = soup.get_text(separator="\n", strip=True)
         # Collapse runs of 3+ blank lines to 2
@@ -225,6 +233,7 @@ async def ingest_8k_transcripts(
 
     results: list[TranscriptResult] = []
     transcripts_extracted = 0
+    press_releases_extracted = 0
     skipped_no_transcript = 0
     parse_failures = 0
     fetch_errors = 0
@@ -340,12 +349,22 @@ async def ingest_8k_transcripts(
                     best_status = "SUCCESS"
                     best_url = exhibit["url"]
                     break  # first passing transcript wins
-                elif status == "PARSE_FAILURE":
+                elif status == "PRESS_RELEASE" and best_status == "NO_TRANSCRIPT":
+                    best_text = text
+                    best_status = "PRESS_RELEASE"
+                    best_url = exhibit["url"]
+                elif status == "PARSE_FAILURE" and best_status not in ("PRESS_RELEASE",):
                     best_status = "PARSE_FAILURE"
                     best_url = exhibit["url"]
 
             if best_status == "SUCCESS":
                 transcripts_extracted += 1
+            elif best_status == "PRESS_RELEASE":
+                press_releases_extracted += 1
+                logger.info(
+                    "8-K press release accepted as transcript fallback",
+                    extra={"ticker": ticker, "filing_url": best_url, "filing_date": filing_date},
+                )
             elif best_status == "NO_TRANSCRIPT":
                 logger.info(
                     "8-K filing skipped",
@@ -370,7 +389,7 @@ async def ingest_8k_transcripts(
                 parse_status=best_status,
             ))
 
-            if best_status == "SUCCESS":
+            if best_status in ("SUCCESS", "PRESS_RELEASE"):
                 await insert_transcript(
                     ticker=ticker,
                     quarter=quarter,
@@ -396,6 +415,7 @@ async def ingest_8k_transcripts(
         date_range_end=end_date,
         total_8k_found=len(filings),
         transcripts_extracted=transcripts_extracted,
+        press_releases_extracted=press_releases_extracted,
         skipped_no_transcript=skipped_no_transcript,
         parse_failures=parse_failures,
         fetch_errors=fetch_errors,
@@ -407,6 +427,7 @@ async def ingest_8k_transcripts(
             "ticker": ticker,
             "total_8k_found": summary.total_8k_found,
             "transcripts_extracted": summary.transcripts_extracted,
+            "press_releases_extracted": summary.press_releases_extracted,
             "skipped_no_transcript": summary.skipped_no_transcript,
             "parse_failures": summary.parse_failures,
             "fetch_errors": summary.fetch_errors,

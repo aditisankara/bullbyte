@@ -148,6 +148,9 @@ async def test_get_exhibit_documents_returns_ex99_docs_with_full_urls(mock_clien
 
 _NON_TRANSCRIPT_HTML = "<html><body><p>This is a press release about quarterly results.</p></body></html>"
 
+# Score 2: "revenue" + "per share" → PRESS_RELEASE
+_PRESS_RELEASE_HTML = "<html><body><p>Revenue for the quarter was $10 billion. Earnings per share were $2.50.</p></body></html>"
+
 _TRANSCRIPT_HTML = textwrap.dedent("""\
     <html><body>
     <p>Operator: Good evening and welcome to the earnings call.</p>
@@ -187,6 +190,90 @@ async def test_extract_transcript_text_malformed_html_returns_none_no_exception(
     )
     assert text is None
     assert status in ("NO_TRANSCRIPT", "PARSE_FAILURE")
+
+
+async def test_low_score_exhibit_returns_press_release(mock_client):
+    """Score 1–2 keywords → PRESS_RELEASE with extracted text (story 3.7 AC1)."""
+    mock_client.fetch.return_value = httpx.Response(200, text=_PRESS_RELEASE_HTML)
+    text, status = await _extract_transcript_text(
+        "https://www.sec.gov/Archives/test.htm", "TSLA", "2024-04-15"
+    )
+    assert status == "PRESS_RELEASE"
+    assert text is not None
+    assert len(text) > 0
+
+
+async def test_zero_score_exhibit_returns_no_transcript(mock_client):
+    """Score 0 keywords → NO_TRANSCRIPT, unchanged from pre-3.7 behaviour (story 3.7 AC2)."""
+    mock_client.fetch.return_value = httpx.Response(200, text=_NON_TRANSCRIPT_HTML)
+    text, status = await _extract_transcript_text(
+        "https://www.sec.gov/Archives/test.htm", "TSLA", "2024-04-15"
+    )
+    assert text is None
+    assert status == "NO_TRANSCRIPT"
+
+
+async def test_press_release_persisted_to_cache(mock_client, monkeypatch):
+    """PRESS_RELEASE exhibit is persisted and counted in press_releases_extracted (story 3.7 AC3)."""
+    from unittest.mock import AsyncMock as _AsyncMock
+
+    tickers_json = {"0": {"cik_str": 1318605, "ticker": "TSLA", "title": "Tesla Inc"}}
+    submissions = {
+        "cik": "1318605",
+        "filings": {
+            "recent": {
+                "accessionNumber": ["0001318605-24-000001"],
+                "filingDate": ["2024-04-15"],
+                "form": ["8-K"],
+            },
+            "files": [],
+        },
+    }
+    mock_client.fetch.side_effect = [
+        httpx.Response(200, json=tickers_json),
+        httpx.Response(200, json=submissions),
+        httpx.Response(200, text=_INDEX_HTML),       # filing index (2 EX-99s)
+        httpx.Response(200, text=_PRESS_RELEASE_HTML),  # exhibit 1 → PRESS_RELEASE
+        httpx.Response(200, text=_PRESS_RELEASE_HTML),  # exhibit 2 → PRESS_RELEASE (loop continues)
+    ]
+    insert_mock = _AsyncMock()
+    monkeypatch.setattr("src.services.ingestion_service.insert_transcript", insert_mock)
+
+    summary = await ingest_8k_transcripts("TSLA", "2024-01-01", "2024-12-31")
+
+    assert summary.press_releases_extracted == 1
+    assert summary.transcripts_extracted == 0
+    insert_mock.assert_called_once()
+    call_kwargs = insert_mock.call_args.kwargs
+    assert call_kwargs["parse_status"] == "PRESS_RELEASE"
+
+
+async def test_success_beats_press_release(mock_client):
+    """First exhibit → PRESS_RELEASE, second → SUCCESS; final result is SUCCESS (story 3.7 AC4)."""
+    tickers_json = {"0": {"cik_str": 1318605, "ticker": "TSLA", "title": "Tesla Inc"}}
+    submissions = {
+        "cik": "1318605",
+        "filings": {
+            "recent": {
+                "accessionNumber": ["0001318605-24-000001"],
+                "filingDate": ["2024-04-15"],
+                "form": ["8-K"],
+            },
+            "files": [],
+        },
+    }
+    mock_client.fetch.side_effect = [
+        httpx.Response(200, json=tickers_json),
+        httpx.Response(200, json=submissions),
+        httpx.Response(200, text=_INDEX_HTML),         # filing index (2 EX-99s)
+        httpx.Response(200, text=_PRESS_RELEASE_HTML),  # exhibit 1 → PRESS_RELEASE
+        httpx.Response(200, text=_TRANSCRIPT_HTML),     # exhibit 2 → SUCCESS → breaks
+    ]
+    summary = await ingest_8k_transcripts("TSLA", "2024-01-01", "2024-12-31")
+
+    assert summary.transcripts_extracted == 1
+    assert summary.press_releases_extracted == 0
+    assert summary.results[0].parse_status == "SUCCESS"
 
 
 # ── Task 7 tests: quarter mapping ────────────────────────────────────────────
