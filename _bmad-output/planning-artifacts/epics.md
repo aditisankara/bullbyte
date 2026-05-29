@@ -809,6 +809,56 @@ So that repeat requests for the same ticker and quarter return cached data insta
 
 ---
 
+### Story 3.7: Press Release Transcript Fallback
+
+As a **developer**,
+I want the ingestion service to fall back to EX-99.1 press releases when no full earnings call transcript is found in an 8-K filing,
+So that Epic 4 claim extraction has real financial-guidance text for every company-quarter instead of zero cached transcripts.
+
+**Acceptance Criteria:**
+
+**Given** an 8-K exhibit that scores 1–2 keyword matches (likely a press release)
+**When** `_extract_transcript_text` processes it
+**Then** it returns the extracted text with `parse_status: "PRESS_RELEASE"` — distinguishing it from a full transcript hit
+
+**Given** an 8-K exhibit that scores 0 keyword matches
+**When** `_extract_transcript_text` processes it
+**Then** it returns `(None, "NO_TRANSCRIPT")` — unchanged from current behaviour
+
+**Given** a filing whose best exhibit scores `PRESS_RELEASE`
+**When** ingestion completes for that quarter
+**Then** the press release text is persisted to the `transcripts` table with `parse_status = "PRESS_RELEASE"`
+**And** `press_releases_extracted` in the `IngestionSummary` is incremented, not `transcripts_extracted`
+
+**Given** a filing whose best exhibit scores `SUCCESS`
+**When** ingestion completes
+**Then** behaviour is unchanged — `SUCCESS` always beats `PRESS_RELEASE`
+
+---
+
+### Story 3.8: Executive Tenure Schema
+
+As a **developer**,
+I want an `executives` table in PostgreSQL that records which person held which C-suite role at which company and when,
+So that Epic 4's CEO delivery score (story 4.6) can roll up per-quarter verdicts to a named individual rather than just a ticker.
+
+**Acceptance Criteria:**
+
+**Given** the Drizzle schema file `api/src/db/schema.ts`
+**When** this story is complete
+**Then** it contains an `executives` table with: `id` (UUID PK), `person_name`, `company_id` (FK → companies), `role`, `start_date`, `end_date` (nullable), `created_at`
+**And** a composite index on `(company_id, role)` for efficient CEO lookup
+
+**Given** the Drizzle migration is generated and committed
+**When** NestJS starts
+**Then** the `executives` table is created automatically via `DrizzleModule`
+
+**Given** `ml-sidecar/src/db/queries.py`
+**When** this story is complete
+**Then** it contains a `get_executive_at_date(ticker, role, date)` helper that returns the person holding that role at that company on the given date, or `None`
+
+---
+
 ## Epic 4: Claim Intelligence — Extraction, Verification & CEO Score
 
 **Layers:** `[ML]` `[DB]`

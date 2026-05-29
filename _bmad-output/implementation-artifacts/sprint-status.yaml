@@ -49,7 +49,7 @@
 # that doesn't conflict with the other developer's active story.
 
 generated: "2026-05-01"
-last_updated: "2026-05-29"  # story 1.1 + 1.3 + 1.5 + 1.6 done; Epic 1 complete; 3.1 done; 3.2 done; 3.3 done; 3.4 done; 3.5 done; 3.6 done; Epic 3 complete
+last_updated: "2026-05-29"  # story 1.1 + 1.3 + 1.5 + 1.6 done; Epic 1 complete; 3.1 done; 3.2 done; 3.3 done; 3.4 done; 3.5 done; 3.6 done; 3.7 + 3.8 added (press release fallback, executive tenure schema); Epic 3 re-opened
 project: bullbyte
 project_key: NOKEY
 tracking_system: file-system
@@ -100,7 +100,7 @@ development_status:
   # PRIORITY: Start after Epic 1. Runs fully in parallel with Epic 5.
   # Unblocks Epic 4.
   # ─────────────────────────────────────────────────────────────
-  epic-3: done
+  epic-3: in-progress
 
   3-1-edgar-http-client-with-rate-limiting-queue: done        # needs 1.3
   3-2-8-k-earnings-call-transcript-ingestion-and-parsing: done  # needs 3.1
@@ -108,6 +108,8 @@ development_status:
   3-4-temporal-alignment-engine: done                 # needs 3.2 + 3.3
   3-5-yfinance-financial-data-supplement: done        # needs 3.3; parallel with 3.4
   3-6-postgresql-caching-and-re-ingestion-prevention: done # needs 3.2 + 3.3 + 1.2
+  3-7-press-release-transcript-fallback: ready-for-dev # needs 3.2 + 3.6; unblocks Epic 4
+  3-8-executive-tenure-schema: ready-for-dev          # needs 1.2; prerequisite for 4.6
 
   epic-3-retrospective: optional
 
