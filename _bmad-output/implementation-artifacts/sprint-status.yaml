@@ -84,14 +84,14 @@ development_status:
   # PRIORITY: Fully independent. Runs in parallel with Epics 3–5.
   # Must complete before Epic 6 frontend implementation begins.
   # ─────────────────────────────────────────────────────────────
-  epic-2: backlog
+  epic-2: in-progress
 
-  2-1-design-token-system: backlog
-  2-2-core-shared-component-specs: backlog            # after 2.1
-  2-3-search-page-and-analysis-progress-feed-specs: backlog  # after 2.2
-  2-4-promise-timeline-and-claim-card-specs: backlog  # after 2.2
-  2-5-claim-detail-panel-and-reasoning-trace-specs: backlog  # after 2.2
-  2-6-ceo-score-card-and-responsive-layout-specs: backlog    # caps Epic 2; needed by Epic 6
+  2-1-design-token-system: review                     # token gaps closed; all 5 verdict pairs verified AA
+  2-2-core-shared-component-specs: ready-for-dev      # after 2.1
+  2-3-search-page-and-analysis-progress-feed-specs: ready-for-dev  # after 2.2
+  2-4-promise-timeline-and-claim-card-specs: ready-for-dev  # after 2.2
+  2-5-claim-detail-panel-and-reasoning-trace-specs: ready-for-dev  # after 2.2
+  2-6-ceo-score-card-and-responsive-layout-specs: ready-for-dev    # caps Epic 2; needed by Epic 6
 
   epic-2-retrospective: optional
 

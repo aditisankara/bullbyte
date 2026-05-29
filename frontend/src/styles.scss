@@ -1,1 +1,10 @@
 /* You can add global styles to this file, and also import other style files */
+
+/*
+ * Design tokens (colors, type, spacing, radii, shadows, motion) live in
+ * src/styles/foundations.css and are loaded BEFORE this file via the
+ * angular.json "styles" array. Use the CSS variables defined there
+ * (e.g. var(--paper), var(--ink), var(--verdict-delivered)) rather than
+ * hardcoding values. App-specific global overrides can go below.
+ */
+

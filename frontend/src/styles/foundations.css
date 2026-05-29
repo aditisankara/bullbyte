@@ -1,0 +1,367 @@
+/* ============================================================
+   BullByte — Foundations
+   Colors, type, spacing, radii, shadows, motion.
+   Single source of truth for all design tokens.
+
+   Ported from the BullByte Design System (colors_and_type.css).
+   Two changes vs. the source:
+     1. The Butler @font-face url points at the vendored asset
+        (/fonts/Butler-Free-Bd.ttf, served from frontend/public).
+     2. The Google Fonts @import (Inter Tight, JetBrains Mono) is
+        loaded via <link> in index.html instead of @import here.
+   Keep this file in sync with the design system; do not hand-edit
+   token values without updating the source.
+   ============================================================ */
+
+/* ---- Webfonts ---------------------------------------------- */
+/* Butler         — display serif (BRAND FONT, vendored ttf)    */
+/* Inter Tight    — UI sans (loaded in index.html)              */
+/* JetBrains Mono — data + quote + reasoning trace (index.html) */
+
+@font-face {
+  font-family: 'Butler';
+  src: url('/fonts/Butler-Free-Bd.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* ============================================================
+     COLOR — Light (default)
+     ============================================================ */
+
+  /* Surfaces */
+  --paper:        #FAF7F2;   /* primary canvas — warm off-white */
+  --paper-2:      #F3EEE4;   /* secondary surface, panels       */
+  --paper-3:      #ECE5D6;   /* tertiary, hovered rows          */
+  --rule:         #E6E1D8;   /* hairline borders                */
+  --rule-strong:  #C9C2B3;
+
+  /* Ink (text & primary) */
+  --ink:          #0F1B2D;   /* primary text, primary brand     */
+  --ink-2:        #2C3A52;   /* secondary text                  */
+  --ink-3:        #5C6B82;   /* tertiary text, captions         */
+  --ink-4:        #8A95A8;   /* disabled, hint text             */
+
+  /* Ink tints (for hover/press washes on paper) */
+  --ink-tint-5:   rgba(15, 27, 45, 0.05);
+  --ink-tint-10:  rgba(15, 27, 45, 0.10);
+  --ink-tint-20:  rgba(15, 27, 45, 0.20);
+
+  /* Brand accent — used SPARINGLY */
+  --gold:         #D4A537;   /* logo, CEO score ring, focus ring */
+  --gold-2:       #B88A22;   /* gold pressed/hover               */
+  --gold-tint:    rgba(212, 165, 55, 0.12);
+
+  /* Brand roles (semantic aliases — reference these by role in specs) */
+  --brand-primary:    var(--ink);    /* primary brand / primary text */
+  --brand-secondary:  var(--gold);   /* accent, used sparingly        */
+
+  /* Verdict semantics — the workhorse palette */
+  --verdict-delivered:      #2F7D5B;
+  --verdict-delivered-bg:   #E4EFE9;
+  --verdict-delivered-ink:  #1F5740;
+
+  --verdict-missed:         #B23A3A;
+  --verdict-missed-bg:      #F2DEDE;
+  --verdict-missed-ink:     #7F2828;
+
+  --verdict-pending:        #C8862B;
+  --verdict-pending-bg:     #F5E8D2;
+  --verdict-pending-ink:    #8A5A1B;
+
+  --verdict-revised:        #6B4E9A;
+  --verdict-revised-bg:     #E8E1F1;
+  --verdict-revised-ink:    #4A356B;
+
+  /* INSUFFICIENT_DATA — neutral slate; not enough actuals to verify yet.
+     Deliberately desaturated so it never reads as a "soft pass/fail".
+     Contrast (bg #E8EAEE on ink #3C4658) ≈ 7.9:1 → WCAG AA (NFR22). */
+  --verdict-insufficient:     #5C6B82;
+  --verdict-insufficient-bg:  #E8EAEE;
+  --verdict-insufficient-ink: #3C4658;
+
+  /* Data viz neutrals (timeline grid, sparklines) */
+  --data-grid:    #DDD6C7;
+  --data-axis:    #5C6B82;
+
+  /* ============================================================
+     TYPE
+     ============================================================ */
+
+  --font-serif:    'Butler', 'Tiempos Headline', Georgia, 'Times New Roman', serif;
+  --font-sans:     'Inter Tight', 'Söhne', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono:     'JetBrains Mono', 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+
+  /* Type scale — 1.2 ratio, 16px base.
+     Decision (Story 2.1): sizes stay in px (matches the design source); the
+     16px html root keeps them rem-equivalent and they scale with user zoom.
+     Per-level weight + line-height are applied via the element styles below
+     (h1–h6, p, .display-number, .pull-quote) rather than bundled per token —
+     that mapping IS the named-type-style spec for 2.1. */
+  --text-xs:       12px;     /* meta, captions, table micro */
+  --text-sm:       14px;     /* secondary body, dense tables */
+  --text-base:     16px;     /* body                         */
+  --text-md:       18px;     /* lead body                    */
+  --text-lg:       22px;     /* h4 / card titles             */
+  --text-xl:       28px;     /* h3                           */
+  --text-2xl:      36px;     /* h2 / page section            */
+  --text-3xl:      48px;     /* h1 / page title              */
+  --text-4xl:      64px;     /* display / score number       */
+  --text-5xl:      96px;     /* hero display                 */
+
+  /* Line heights */
+  --lh-tight:      1.1;
+  --lh-snug:       1.25;
+  --lh-normal:     1.5;
+  --lh-relaxed:    1.65;
+
+  /* Letter spacing */
+  --tracking-tight:    -0.02em;
+  --tracking-normal:    0;
+  --tracking-wide:      0.02em;
+  --tracking-mono:      0;
+  --tracking-allcaps:   0.06em;
+
+  /* ============================================================
+     SPACING — 8px-aligned
+     ============================================================ */
+
+  --space-1:    4px;
+  --space-2:    8px;
+  --space-3:    12px;
+  --space-4:    16px;
+  --space-5:    20px;
+  --space-6:    24px;
+  --space-7:    32px;
+  --space-8:    40px;
+  --space-9:    48px;
+  --space-10:   64px;
+  --space-11:   80px;
+  --space-12:   96px;
+
+  /* ============================================================
+     RADII
+     ============================================================ */
+
+  --radius-none:  0;
+  --radius-sm:    4px;     /* inputs, buttons, badges, pills */
+  --radius-md:    8px;     /* cards, panels                  */
+  --radius-lg:   12px;     /* modals, search overlay         */
+  --radius-full: 9999px;   /* avatars, the score ring        */
+
+  /* ============================================================
+     SHADOWS — soft, neutral
+     ============================================================ */
+
+  --shadow-1:
+    0 1px 2px rgba(15, 27, 45, 0.06),
+    0 1px 3px rgba(15, 27, 45, 0.04);
+  --shadow-2:
+    0 8px 24px rgba(15, 27, 45, 0.08),
+    0 2px 6px rgba(15, 27, 45, 0.05);
+  --shadow-focus:
+    0 0 0 2px var(--paper),
+    0 0 0 4px var(--gold);
+
+  /* ============================================================
+     MOTION
+     ============================================================ */
+
+  --ease-out:   cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+  --dur-hover:   150ms;
+  --dur-state:   200ms;
+  --dur-layout:  280ms;
+
+  /* ============================================================
+     LAYOUT
+     ============================================================ */
+
+  --max-w:        1200px;
+  --nav-h:        64px;
+  --gutter:       24px;
+}
+
+/* ============================================================
+   COLOR — Dark mode
+   Flip paper → ink, lightly desaturate verdicts.
+   ============================================================ */
+
+[data-theme="dark"] {
+  --paper:        #0F1B2D;
+  --paper-2:      #16243A;
+  --paper-3:      #1E2E47;
+  --rule:         #2A364A;
+  --rule-strong:  #3F4D66;
+
+  --ink:          #FAF7F2;
+  --ink-2:        #D6CFBE;
+  --ink-3:        #98A1B3;
+  --ink-4:        #6B7588;
+
+  --ink-tint-5:   rgba(250, 247, 242, 0.06);
+  --ink-tint-10:  rgba(250, 247, 242, 0.10);
+  --ink-tint-20:  rgba(250, 247, 242, 0.18);
+
+  --gold:         #E0B547;   /* slightly brighter on dark */
+  --gold-2:       #C49A2D;
+  --gold-tint:    rgba(224, 181, 71, 0.16);
+
+  --verdict-delivered:      #4FA37C;
+  --verdict-delivered-bg:   rgba(79, 163, 124, 0.14);
+  --verdict-delivered-ink:  #7CC09E;
+
+  --verdict-missed:         #D45959;
+  --verdict-missed-bg:      rgba(212, 89, 89, 0.14);
+  --verdict-missed-ink:     #E08585;
+
+  --verdict-pending:        #DBA34A;
+  --verdict-pending-bg:     rgba(219, 163, 74, 0.14);
+  --verdict-pending-ink:    #E5BB75;
+
+  --verdict-revised:        #9277C0;
+  --verdict-revised-bg:     rgba(146, 119, 192, 0.14);
+  --verdict-revised-ink:    #B19DD2;
+
+  --verdict-insufficient:     #8A95A8;
+  --verdict-insufficient-bg:  rgba(138, 149, 168, 0.14);
+  --verdict-insufficient-ink: #AEB7C6;
+
+  --data-grid:    #2A364A;
+  --data-axis:    #98A1B3;
+
+  --shadow-1:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-2:
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================
+   SEMANTIC ELEMENT STYLES
+   Apply directly to native elements so unstyled markup looks
+   on-brand by default.
+   ============================================================ */
+
+html {
+  font-size: 16px;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--lh-normal);
+  color: var(--ink);
+  background: var(--paper);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  font-feature-settings: 'ss01' on, 'cv11' on;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-serif);
+  color: var(--ink);
+  font-weight: 700;
+  margin: 0 0 var(--space-4);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--lh-tight);
+  text-wrap: balance;
+}
+
+h1 { font-size: var(--text-3xl); }
+h2 { font-size: var(--text-2xl); }
+h3 { font-size: var(--text-xl);  letter-spacing: var(--tracking-normal); }
+h4 { font-size: var(--text-lg);  letter-spacing: var(--tracking-normal); }
+
+h5, h6 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-allcaps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 var(--space-3);
+}
+
+p {
+  margin: 0 0 var(--space-4);
+  line-height: var(--lh-relaxed);
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+p.lead {
+  font-size: var(--text-md);
+  color: var(--ink);
+  line-height: var(--lh-relaxed);
+}
+
+small, .meta {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  letter-spacing: var(--tracking-wide);
+}
+
+a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--dur-hover) var(--ease-out);
+}
+a:hover { text-decoration-color: var(--ink); }
+
+code, kbd, samp, .mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  font-feature-settings: 'zero' on, 'ss01' on;
+  letter-spacing: var(--tracking-mono);
+}
+
+/* Tickers — uppercase mono */
+.ticker {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-mono);
+}
+
+/* Pull-quote from earnings call */
+blockquote, .pull-quote {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  line-height: var(--lh-snug);
+  color: var(--ink);
+  border-left: 2px solid var(--ink);
+  padding: 0 0 0 var(--space-5);
+  margin: var(--space-6) 0;
+  font-style: normal;
+  text-wrap: pretty;
+}
+
+/* Display number (CEO score, hero metrics) */
+.display-number {
+  font-family: var(--font-serif);
+  font-size: var(--text-4xl);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+::selection { background: var(--gold-tint); color: var(--ink); }
+
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
