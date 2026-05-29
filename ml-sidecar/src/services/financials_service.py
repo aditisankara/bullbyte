@@ -2,22 +2,39 @@
 10-Q/10-K financial actuals ingestion service.
 
 Entry point: ``ingest_financial_actuals(ticker, quarter)``
-Returns an in-memory ``FinancialsResult`` — no DB writes (persistence is story 3.6).
+Returns a ``FinancialsResult``. Checks PostgreSQL cache before fetching from EDGAR
+and persists SUCCESS/PARTIAL results after fetching.
 All HTTP calls go through ``get_client()`` from ``src.core.edgar_client``.
 """
+import asyncio
 import json
 import re
+import time
 from datetime import datetime, timedelta
 
+import asyncpg
 from bs4 import BeautifulSoup
 
 from src.core.edgar_client import EdgarFetchError, get_client
 from src.core.logging import get_logger
+from src.db.queries import get_cached_financial_actuals, insert_financial_actuals
 from src.models.financials_models import FinancialMetric, FinancialMetricStatus, FinancialsResult
 from src.services.ingestion_service import resolve_cik
 from src.services.yfinance_service import supplement_with_yfinance
 
 logger = get_logger("ml-sidecar.financials_service")
+
+# Per (ticker, quarter) asyncio locks — prevent duplicate EDGAR fetches under concurrency (NFR11)
+_FINANCIALS_CACHE_LOCKS: dict[str, asyncio.Lock] = {}
+_FINANCIALS_CACHE_LOCKS_META = asyncio.Lock()
+
+
+async def _get_financials_lock(ticker: str, quarter: str) -> asyncio.Lock:
+    key = f"{ticker}:{quarter}"
+    async with _FINANCIALS_CACHE_LOCKS_META:
+        if key not in _FINANCIALS_CACHE_LOCKS:
+            _FINANCIALS_CACHE_LOCKS[key] = asyncio.Lock()
+        return _FINANCIALS_CACHE_LOCKS[key]
 
 # Priority-ordered fallback lists. First match in the XBRL facts wins.
 XBRL_METRIC_CONCEPTS: dict[str, list[tuple[str, str]]] = {
@@ -430,6 +447,21 @@ def _collect_submission_entries(recent: dict) -> list[dict]:
 
 # ── Task 9: Top-level orchestrator ────────────────────────────────────────────
 
+def _reconstruct_financials_result(row: asyncpg.Record) -> FinancialsResult:
+    """Reconstruct a FinancialsResult from a cached financial_actuals DB row."""
+    raw = row["metrics"]
+    metrics_data: list[dict] = json.loads(raw) if isinstance(raw, str) else (raw or [])
+    metrics = [FinancialMetric(**m) for m in metrics_data]
+    return FinancialsResult(
+        ticker=row["ticker"],
+        quarter=row["quarter"],
+        filing_type=row["filing_type"],
+        status=row["status"],
+        metrics=metrics,
+        filing_url=row["filing_url"],
+    )
+
+
 async def ingest_financial_actuals(ticker: str, quarter: str) -> FinancialsResult:
     """
     Fetch and parse 10-Q/10-K financial actuals for ``ticker`` and ``quarter``.
@@ -441,115 +473,160 @@ async def ingest_financial_actuals(ticker: str, quarter: str) -> FinancialsResul
     Returns:
         ``FinancialsResult`` with extracted metrics. No DB writes.
     """
-    filing_type = _quarter_to_filing_type(quarter)
+    start_time = time.monotonic()
 
-    try:
-        cik = await resolve_cik(ticker)
-    except ValueError:
-        logger.error(
-            "Unknown ticker — CIK resolution failed",
-            extra={"ticker": ticker, "quarter": quarter},
-        )
-        return FinancialsResult(
-            ticker=ticker, quarter=quarter, filing_type=filing_type,
-            status="FETCH_ERROR", metrics=[], filing_url="",
-        )
-    cik_int = str(int(cik))
-
-    try:
-        accession_no = await _find_filing_accession(cik, ticker, quarter, filing_type)
-    except EdgarFetchError as exc:
-        logger.error(
-            "Submissions fetch failed during filing lookup",
-            extra={"ticker": ticker, "quarter": quarter, "error": str(exc)},
-        )
-        return FinancialsResult(
-            ticker=ticker, quarter=quarter, filing_type=filing_type,
-            status="FETCH_ERROR", metrics=[], filing_url="",
-        )
-
-    if accession_no is None:
+    # ── Fast-path cache check (no lock — optimistic) ──────────────────────────
+    cached = await get_cached_financial_actuals(ticker, quarter)
+    if cached:
         logger.info(
-            "10-Q not yet filed",
-            extra={"ticker": ticker, "quarter": quarter, "reason": "no_filing_found"},
+            "financial actuals cache hit",
+            extra={"ticker": ticker, "quarter": quarter, "cache_hit": True},
         )
-        return FinancialsResult(
+        return _reconstruct_financials_result(cached)
+
+    # ── Slow-path: acquire per-quarter lock to prevent duplicate EDGAR fetches ─
+    _lock = await _get_financials_lock(ticker, quarter)
+    async with _lock:
+        # Re-check after acquiring lock — another coroutine may have populated it while we waited
+        cached = await get_cached_financial_actuals(ticker, quarter)
+        if cached:
+            logger.info(
+                "financial actuals cache hit (post-lock re-check)",
+                extra={"ticker": ticker, "quarter": quarter, "cache_hit": True},
+            )
+            return _reconstruct_financials_result(cached)
+
+        # ── EDGAR fetch (existing logic) ──────────────────────────────────────
+        filing_type = _quarter_to_filing_type(quarter)
+
+        try:
+            cik = await resolve_cik(ticker)
+        except ValueError:
+            logger.error(
+                "Unknown ticker — CIK resolution failed",
+                extra={"ticker": ticker, "quarter": quarter},
+            )
+            return FinancialsResult(
+                ticker=ticker, quarter=quarter, filing_type=filing_type,
+                status="FETCH_ERROR", metrics=[], filing_url="",
+            )
+        cik_int = str(int(cik))
+
+        try:
+            accession_no = await _find_filing_accession(cik, ticker, quarter, filing_type)
+        except EdgarFetchError as exc:
+            logger.error(
+                "Submissions fetch failed during filing lookup",
+                extra={"ticker": ticker, "quarter": quarter, "error": str(exc)},
+            )
+            return FinancialsResult(
+                ticker=ticker, quarter=quarter, filing_type=filing_type,
+                status="FETCH_ERROR", metrics=[], filing_url="",
+            )
+
+        if accession_no is None:
+            logger.info(
+                "10-Q not yet filed",
+                extra={"ticker": ticker, "quarter": quarter, "reason": "no_filing_found"},
+            )
+            return FinancialsResult(
+                ticker=ticker,
+                quarter=quarter,
+                filing_type=filing_type,
+                status="FILING_NOT_YET_AVAILABLE",
+                metrics=[],
+                filing_url="",
+            )
+
+        accession_path = accession_no.replace("-", "")
+        filing_url = (
+            f"https://www.sec.gov/Archives/edgar/data/{cik_int}"
+            f"/{accession_path}/{accession_no}-index.htm"
+        )
+
+        try:
+            xbrl_data = await _fetch_xbrl_facts(cik, ticker)
+        except EdgarFetchError as exc:
+            logger.error(
+                "XBRL facts fetch failed",
+                extra={"ticker": ticker, "quarter": quarter, "error": str(exc)},
+            )
+            return FinancialsResult(
+                ticker=ticker,
+                quarter=quarter,
+                filing_type=filing_type,
+                status="FETCH_ERROR",
+                metrics=[],
+                filing_url=filing_url,
+            )
+
+        metrics = _extract_xbrl_metrics(xbrl_data, ticker, quarter, filing_type, filing_url)
+
+        # Guidance extraction is best-effort — never fails the overall result
+        guidance_metrics = await _extract_guidance_from_html(
+            cik, accession_no, ticker, quarter, filing_type, filing_url
+        )
+        metrics.extend(guidance_metrics)
+
+        # yfinance supplement: fill in AMBIGUOUS or missing XBRL metrics
+        expected_metrics = set(XBRL_METRIC_CONCEPTS.keys())
+        edgar_success = {m.metric_name for m in metrics if m.parse_status == "SUCCESS"}
+        ambiguous = {m.metric_name for m in metrics if m.parse_status == "AMBIGUOUS" and m.metric_name in expected_metrics}
+        missing = expected_metrics - {m.metric_name for m in metrics}
+        supplement_targets = list(ambiguous | missing)
+
+        if supplement_targets:
+            yf_metrics = await supplement_with_yfinance(ticker, quarter, supplement_targets)
+            yf_added_names = {m.metric_name for m in yf_metrics if m.metric_name not in edgar_success}
+            metrics = [m for m in metrics if not (m.metric_name in yf_added_names and m.parse_status == "AMBIGUOUS")]
+            for yf_metric in yf_metrics:
+                if yf_metric.metric_name not in edgar_success:
+                    metrics.append(yf_metric)
+
+        if not metrics:
+            result_status = "PARTIAL"
+        elif any(m.parse_status == "AMBIGUOUS" for m in metrics):
+            result_status = "PARTIAL"
+        else:
+            result_status = "SUCCESS"
+
+        result = FinancialsResult(
             ticker=ticker,
             quarter=quarter,
             filing_type=filing_type,
-            status="FILING_NOT_YET_AVAILABLE",
-            metrics=[],
-            filing_url="",
-        )
-
-    accession_path = accession_no.replace("-", "")
-    filing_url = (
-        f"https://www.sec.gov/Archives/edgar/data/{cik_int}"
-        f"/{accession_path}/{accession_no}-index.htm"
-    )
-
-    try:
-        xbrl_data = await _fetch_xbrl_facts(cik, ticker)
-    except EdgarFetchError as exc:
-        logger.error(
-            "XBRL facts fetch failed",
-            extra={"ticker": ticker, "quarter": quarter, "error": str(exc)},
-        )
-        return FinancialsResult(
-            ticker=ticker,
-            quarter=quarter,
-            filing_type=filing_type,
-            status="FETCH_ERROR",
-            metrics=[],
+            status=result_status,
+            metrics=metrics,
             filing_url=filing_url,
         )
 
-    metrics = _extract_xbrl_metrics(xbrl_data, ticker, quarter, filing_type, filing_url)
+        logger.info(
+            "financial actuals ingestion complete",
+            extra={
+                "ticker": ticker,
+                "quarter": quarter,
+                "filing_type": filing_type,
+                "status": result_status,
+                "metrics_count": len(metrics),
+            },
+        )
 
-    # Guidance extraction is best-effort — never fails the overall result
-    guidance_metrics = await _extract_guidance_from_html(
-        cik, accession_no, ticker, quarter, filing_type, filing_url
-    )
-    metrics.extend(guidance_metrics)
+        if result.status in ("SUCCESS", "PARTIAL"):
+            await insert_financial_actuals(
+                ticker=result.ticker,
+                quarter=result.quarter,
+                filing_type=result.filing_type,
+                status=result.status,
+                filing_url=result.filing_url,
+                metrics_json=json.dumps([m.model_dump() for m in result.metrics]),
+            )
 
-    # yfinance supplement: fill in AMBIGUOUS or missing XBRL metrics
-    expected_metrics = set(XBRL_METRIC_CONCEPTS.keys())
-    edgar_success = {m.metric_name for m in metrics if m.parse_status == "SUCCESS"}
-    ambiguous = {m.metric_name for m in metrics if m.parse_status == "AMBIGUOUS" and m.metric_name in expected_metrics}
-    missing = expected_metrics - {m.metric_name for m in metrics}
-    supplement_targets = list(ambiguous | missing)
-
-    if supplement_targets:
-        yf_metrics = await supplement_with_yfinance(ticker, quarter, supplement_targets)
-        yf_added_names = {m.metric_name for m in yf_metrics if m.metric_name not in edgar_success}
-        metrics = [m for m in metrics if not (m.metric_name in yf_added_names and m.parse_status == "AMBIGUOUS")]
-        for yf_metric in yf_metrics:
-            if yf_metric.metric_name not in edgar_success:
-                metrics.append(yf_metric)
-
-    if not metrics:
-        result_status = "PARTIAL"
-    elif any(m.parse_status == "AMBIGUOUS" for m in metrics):
-        result_status = "PARTIAL"
-    else:
-        result_status = "SUCCESS"
-
-    logger.info(
-        "financial actuals ingestion complete",
-        extra={
-            "ticker": ticker,
-            "quarter": quarter,
-            "filing_type": filing_type,
-            "status": result_status,
-            "metrics_count": len(metrics),
-        },
-    )
-
-    return FinancialsResult(
-        ticker=ticker,
-        quarter=quarter,
-        filing_type=filing_type,
-        status=result_status,
-        metrics=metrics,
-        filing_url=filing_url,
-    )
+        logger.info(
+            "financial actuals cache miss — EDGAR fetch complete",
+            extra={
+                "ticker": ticker,
+                "quarter": quarter,
+                "cache_hit": False,
+                "fetch_duration_ms": int((time.monotonic() - start_time) * 1000),
+            },
+        )
+        return result

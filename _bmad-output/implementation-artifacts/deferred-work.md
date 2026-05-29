@@ -96,6 +96,12 @@ is reusable for any of the above; only the source URL and keyword scorer thresho
 - No defensive guard for `quarterly_income_stmt` returning `None` (invalid/private tickers) — covered by outer `except Exception`, returns `[]` as intended; add explicit `if df is None or df.empty: return []` for clarity when the service is hardened
 - `_METRIC_TO_ROW_LABEL` covers only 6 metrics and silently skips unknown names — by design per spec; add a `logger.warning` for unmapped metric names when observability of supplement coverage gaps is needed
 
+## Deferred from: code review of 3-6-postgresql-caching-and-re-ingestion-prevention (2026-05-28)
+
+- `_reconstruct_financials_result` raises uncaught `ValidationError` if DB JSONB row schema doesn't match current `FinancialMetric` model — pre-existing future risk; handle in a schema-evolution or cache-migration story when the model changes
+- `PARTIAL` financials cached permanently with no invalidation mechanism — SUCCESS data from a later EDGAR fetch is never used once PARTIAL is stored; deliberate spec choice, revisit with a TTL/cache-upgrade story before production
+- `fetch_duration_ms` in financials cache-miss log includes fast-path DB check and lock acquisition time, not only EDGAR fetch — misleading for performance monitoring; fix by moving `start_time` assignment after the optimistic DB check, or rename the field
+
 ## Deferred from: code review of 3-4-temporal-alignment-engine (2026-05-27)
 
 - `acc_no.replace("-", "")` has no accession number format validation [temporal_aligner.py] — pre-existing pattern in financials_service.py; EDGAR is reliable source; scope creep for 3.4
