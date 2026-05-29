@@ -8,6 +8,8 @@ export const appValidationSchema = Joi.object({
 	DATABASE_URL: Joi.string().uri().required(),
 	REDIS_URL: Joi.string().uri().required(),
 	ML_SIDECAR_URL: Joi.string().uri().required(),
+	// Shared secret for the FastAPI -> NestJS internal progress webhook (story 5.3).
+	INTERNAL_WEBHOOK_SECRET: Joi.string().required(),
 	LOG_LEVEL: Joi.string()
 		.valid('debug', 'info', 'warn', 'error')
 		.default('info'),

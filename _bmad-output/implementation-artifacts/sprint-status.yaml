@@ -136,7 +136,7 @@ development_status:
 
   5-1-bullmq-async-analysis-job-queue: ready-for-dev     # needs 1.4; story drafted + module scaffolded
   5-2-sse-progress-stream-endpoint: backlog              # needs 5.1
-  5-3-fastapi-to-nestjs-webhook-progress-relay: backlog  # needs 5.2 + 1.3
+  5-3-fastapi-to-nestjs-webhook-progress-relay: review   # needs 5.2 + 1.3
   5-4-company-and-search-api-endpoints: backlog          # needs 1.4; parallel with 5.1
   5-5-claims-timeline-and-claim-detail-api-endpoints: backlog  # needs 5.4 + Epic 4
   5-6-ceo-score-endpoint-and-immutable-verdict-writes: backlog # needs 4.6 + 5.4
