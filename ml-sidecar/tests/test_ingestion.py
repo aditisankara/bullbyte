@@ -151,6 +151,9 @@ _NON_TRANSCRIPT_HTML = "<html><body><p>This is a press release about quarterly r
 # Score 2: "revenue" + "per share" → PRESS_RELEASE
 _PRESS_RELEASE_HTML = "<html><body><p>Revenue for the quarter was $10 billion. Earnings per share were $2.50.</p></body></html>"
 
+# Score 1: "revenue" only → PRESS_RELEASE (lower bound of AC1)
+_SCORE_1_HTML = "<html><body><p>Revenue for the quarter was $10 billion. Costs remained stable.</p></body></html>"
+
 _TRANSCRIPT_HTML = textwrap.dedent("""\
     <html><body>
     <p>Operator: Good evening and welcome to the earnings call.</p>
@@ -193,8 +196,19 @@ async def test_extract_transcript_text_malformed_html_returns_none_no_exception(
 
 
 async def test_low_score_exhibit_returns_press_release(mock_client):
-    """Score 1–2 keywords → PRESS_RELEASE with extracted text (story 3.7 AC1)."""
+    """Score 2 keywords → PRESS_RELEASE with extracted text (story 3.7 AC1)."""
     mock_client.fetch.return_value = httpx.Response(200, text=_PRESS_RELEASE_HTML)
+    text, status = await _extract_transcript_text(
+        "https://www.sec.gov/Archives/test.htm", "TSLA", "2024-04-15"
+    )
+    assert status == "PRESS_RELEASE"
+    assert text is not None
+    assert len(text) > 0
+
+
+async def test_score_1_exhibit_returns_press_release(mock_client):
+    """Score 1 keyword → PRESS_RELEASE — lower bound of AC1 (score >= 1)."""
+    mock_client.fetch.return_value = httpx.Response(200, text=_SCORE_1_HTML)
     text, status = await _extract_transcript_text(
         "https://www.sec.gov/Archives/test.htm", "TSLA", "2024-04-15"
     )
@@ -234,7 +248,7 @@ async def test_press_release_persisted_to_cache(mock_client, monkeypatch):
         httpx.Response(200, json=submissions),
         httpx.Response(200, text=_INDEX_HTML),       # filing index (2 EX-99s)
         httpx.Response(200, text=_PRESS_RELEASE_HTML),  # exhibit 1 → PRESS_RELEASE
-        httpx.Response(200, text=_PRESS_RELEASE_HTML),  # exhibit 2 → PRESS_RELEASE (loop continues)
+        httpx.Response(200, text=_PRESS_RELEASE_HTML),  # exhibit 2 → PRESS_RELEASE (ignored — best_status already PRESS_RELEASE)
     ]
     insert_mock = _AsyncMock()
     monkeypatch.setattr("src.services.ingestion_service.insert_transcript", insert_mock)
@@ -246,6 +260,42 @@ async def test_press_release_persisted_to_cache(mock_client, monkeypatch):
     insert_mock.assert_called_once()
     call_kwargs = insert_mock.call_args.kwargs
     assert call_kwargs["parse_status"] == "PRESS_RELEASE"
+
+
+async def test_press_release_not_downgraded_by_exhibit_fetch_error(mock_client):
+    """FETCH_ERROR on exhibit 2 must not overwrite a PRESS_RELEASE found on exhibit 1 (story 3.7)."""
+    from src.core.edgar_client import EdgarFetchError
+
+    tickers_json = {"0": {"cik_str": 1318605, "ticker": "TSLA", "title": "Tesla Inc"}}
+    submissions = {
+        "cik": "1318605",
+        "filings": {
+            "recent": {
+                "accessionNumber": ["0001318605-24-000001"],
+                "filingDate": ["2024-04-15"],
+                "form": ["8-K"],
+            },
+            "files": [],
+        },
+    }
+
+    fetch_error = EdgarFetchError(
+        ticker="TSLA", filing_type="8-K-exhibit",
+        url="https://sec.gov/Archives/ex992.htm", final_status=503,
+    )
+
+    mock_client.fetch.side_effect = [
+        httpx.Response(200, json=tickers_json),
+        httpx.Response(200, json=submissions),
+        httpx.Response(200, text=_INDEX_HTML),          # filing index (2 EX-99s)
+        httpx.Response(200, text=_PRESS_RELEASE_HTML),  # exhibit 1 → PRESS_RELEASE
+        fetch_error,                                    # exhibit 2 → FETCH_ERROR (must not overwrite)
+    ]
+    summary = await ingest_8k_transcripts("TSLA", "2024-01-01", "2024-12-31")
+
+    assert summary.press_releases_extracted == 1
+    assert summary.transcripts_extracted == 0
+    assert summary.results[0].parse_status == "PRESS_RELEASE"
 
 
 async def test_success_beats_press_release(mock_client):

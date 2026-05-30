@@ -1,6 +1,6 @@
 # Story 3.7: Press Release Transcript Fallback
 
-Status: review
+Status: done
 
 ## Story
 
@@ -248,3 +248,14 @@ claude-sonnet-4-6 (implementation via bmad-dev-story, 2026-05-29)
 - ml-sidecar/src/services/ingestion_service.py
 - ml-sidecar/tests/test_ingestion.py
 - api/src/db/schema.ts
+
+### Review Findings
+
+- [x] [Review][Patch] Cached PRESS_RELEASE not counted in `press_releases_extracted` on cache hit [ml-sidecar/src/services/ingestion_service.py:276]
+- [x] [Review][Patch] FETCH_ERROR unconditionally overwrites a previously found PRESS_RELEASE in exhibit loop [ml-sidecar/src/services/ingestion_service.py:344]
+- [x] [Review][Patch] Score=1 boundary not tested — AC1 specifies 1–2 matches but only score=2 is covered by `_PRESS_RELEASE_HTML` [ml-sidecar/tests/test_ingestion.py]
+- [x] [Review][Patch] Missing test for cached PRESS_RELEASE cache-hit path (AC5) — no test in `test_caching.py` verifies `press_releases_extracted` is incremented on cache hit [ml-sidecar/tests/test_caching.py]
+- [x] [Review][Patch] Missing test: FETCH_ERROR on exhibit 2 should not overwrite a PRESS_RELEASE found on exhibit 1 [ml-sidecar/tests/test_ingestion.py]
+- [x] [Review][Patch] Misleading comment in `test_press_release_persisted_to_cache` — "exhibit 2 → PRESS_RELEASE (loop continues)" implies it is processed, but the `best_status == "NO_TRANSCRIPT"` guard silently ignores it [ml-sidecar/tests/test_ingestion.py]
+- [x] [Review][Defer] `parse_status` DB column has no CHECK constraint — text column accepts any value; no enum enforcement [api/src/db/schema.ts:169] — deferred, pre-existing
+- [x] [Review][Defer] No `TranscriptResult` appended when `_get_exhibit_documents` returns empty list — inconsistency with other failure paths [ml-sidecar/src/services/ingestion_service.py:314] — deferred, pre-existing

@@ -275,6 +275,8 @@ async def ingest_8k_transcripts(
                 ))
                 if cached["parse_status"] == "SUCCESS":
                     transcripts_extracted += 1
+                elif cached["parse_status"] == "PRESS_RELEASE":
+                    press_releases_extracted += 1
                 continue
 
             # ── Cache miss: proceed with EDGAR fetch ──────────────────────────
@@ -341,8 +343,9 @@ async def ingest_8k_transcripts(
                         "8-K exhibit fetch failed",
                         extra={"ticker": ticker, "url": exhibit["url"], "status": exc.final_status},
                     )
-                    best_status = "FETCH_ERROR"
-                    best_url = exhibit["url"]
+                    if best_status == "NO_TRANSCRIPT":
+                        best_status = "FETCH_ERROR"
+                        best_url = exhibit["url"]
                     continue
                 if status == "SUCCESS":
                     best_text = text
