@@ -69,6 +69,25 @@ async def test_transcript_cache_hit_skips_edgar_fetch():
     assert summary.results[0].parse_status == "SUCCESS"
 
 
+async def test_press_release_cache_hit_increments_press_releases_extracted():
+    """Cached PRESS_RELEASE must increment press_releases_extracted, not transcripts_extracted (story 3.7 AC5)."""
+    cached_press_release_row = {**_CACHED_TRANSCRIPT_ROW, "parse_status": "PRESS_RELEASE"}
+    with patch("src.services.ingestion_service.get_cached_transcript",
+               new_callable=AsyncMock, return_value=cached_press_release_row), \
+         patch("src.services.ingestion_service.get_client") as mock_client, \
+         patch("src.services.ingestion_service.resolve_cik",
+               new_callable=AsyncMock, return_value="0001318605"), \
+         patch("src.services.ingestion_service._get_8k_filings",
+               new_callable=AsyncMock,
+               return_value=[{"accession_no": "0001318605-24-000123", "filing_date": "2024-10-23"}]):
+        summary = await ingest_8k_transcripts("TSLA", "2024-10-01", "2024-10-31")
+
+    mock_client.return_value.fetch.assert_not_called()
+    assert summary.press_releases_extracted == 1
+    assert summary.transcripts_extracted == 0
+    assert summary.results[0].parse_status == "PRESS_RELEASE"
+
+
 async def test_transcript_cache_hit_logs_cache_hit(caplog):
     """Cache hit must emit a structured log with cache_hit: True."""
     with patch("src.services.ingestion_service.get_cached_transcript",

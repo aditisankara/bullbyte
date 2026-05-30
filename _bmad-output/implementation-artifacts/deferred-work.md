@@ -103,11 +103,16 @@ score ≥ 3 → `SUCCESS`, score 1–2 → `PRESS_RELEASE`, score 0 → `NO_TRAN
 - `PARTIAL` financials cached permanently with no invalidation mechanism — SUCCESS data from a later EDGAR fetch is never used once PARTIAL is stored; deliberate spec choice, revisit with a TTL/cache-upgrade story before production
 - `fetch_duration_ms` in financials cache-miss log includes fast-path DB check and lock acquisition time, not only EDGAR fetch — misleading for performance monitoring; fix by moving `start_time` assignment after the optimistic DB check, or rename the field
 
+## Deferred from: code review of 3-7-press-release-transcript-fallback (2026-05-29)
+
+- `parse_status` column in `transcripts` table has no `CHECK` constraint — text column accepts any value; no DB-level enum enforcement [api/src/db/schema.ts:169]; address in a schema hardening story
+- No `TranscriptResult` appended when `_get_exhibit_documents` returns an empty list — creates inconsistency with other failure paths (index FETCH_ERROR does append a result); pre-existing pattern, low impact [ingestion_service.py:314]; address in a future result-consistency story
+
 ## Deferred from: code review of 3-4-temporal-alignment-engine (2026-05-27)
 
 - `acc_no.replace("-", "")` has no accession number format validation [temporal_aligner.py] — pre-existing pattern in financials_service.py; EDGAR is reliable source; scope creep for 3.4
 - `str(int(cik))` will raise uncaught `ValueError` if non-numeric CIK passed [temporal_aligner.py] — internal function; `resolve_cik` guarantees zero-padded numeric string; address if CIK handling is generalized
 - Filing date window lower bound (`period_end_dt <= filing_dt`) excludes any filing filed before period end [temporal_aligner.py] — calendar-quarter design is intentional; fiscal year offset handled by alt-quarter fallback path
-- Earliest filing selected over later amendments within 180-day window [temporal_aligner.py] — pre-existing pattern in financials_service.py; for temporal alignment the original filing is the canonical source; revisit if amendment handling is needed
+- Earliest fili ng selected over later amendments within 180-day window [temporal_aligner.py] — pre-existing pattern in financials_service.py; for temporal alignment the original filing is the canonical source; revisit if amendment handling is needed
 - `_quarter_to_period_end` inconsistently lacks `len(parts) != 2` guard vs `_next_quarter` [temporal_aligner.py] — `IndexError` is caught and re-raised as `ValueError`; works correctly; minor style inconsistency
 - `PENDING` status assigned `LOW` confidence — spec AC3 only requires `PENDING` status; `LOW` is the most reasonable default given no filing is confirmed; clarify if consumers need a distinct confidence value for pending states
