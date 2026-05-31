@@ -169,24 +169,22 @@ async def _extract_transcript_text(
     """
     try:
         response = await get_client().fetch(url, ticker=ticker, filing_type="8-K-exhibit")
-        preview = response.text[:8000].lower()
+        # Strip HTML first so the 8000-char preview is plain text, not markup.
+        # This prevents heavy inline CSS / SEC boilerplate from pushing financial
+        # keywords past the preview window (e.g. AMZN's 578 KB HTML files where
+        # "revenue" first appears well past char 8000 in raw HTML).
+        soup = BeautifulSoup(response.text, "lxml")
+        raw = soup.get_text(separator="\n", strip=True)
+        cleaned = re.sub(r"\n{3,}", "\n\n", raw)
+        preview = cleaned[:8000].lower()
         # Use a set to count unique keyword matches per spec (Task 6: "count unique keyword matches")
         score = len({kw for kw in _TRANSCRIPT_KEYWORDS if kw in preview})
         if score >= 3:
-            pass  # fall through to SUCCESS extraction below
+            return cleaned, "SUCCESS"
         elif score >= 1:
-            soup = BeautifulSoup(response.text, "lxml")
-            raw = soup.get_text(separator="\n", strip=True)
-            cleaned = re.sub(r"\n{3,}", "\n\n", raw)
             return cleaned, "PRESS_RELEASE"
         else:
             return None, "NO_TRANSCRIPT"
-        # SUCCESS path — reached only when score >= 3
-        soup = BeautifulSoup(response.text, "lxml")
-        raw = soup.get_text(separator="\n", strip=True)
-        # Collapse runs of 3+ blank lines to 2
-        cleaned = re.sub(r"\n{3,}", "\n\n", raw)
-        return cleaned, "SUCCESS"
     except EdgarFetchError:
         raise  # caller handles FETCH_ERROR
     except Exception as exc:
