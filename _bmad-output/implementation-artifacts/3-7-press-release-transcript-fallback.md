@@ -242,6 +242,58 @@ claude-sonnet-4-6 (implementation via bmad-dev-story, 2026-05-29)
 - 4 new tests added; all 130 tests pass with zero regressions
 - `deferred-work.md` already contained the correct updated section from story creation
 
+### Post-Close Hotfix (2026-05-31) — HTML strip before keyword scoring
+
+**Found during:** Manual testing of 3-7 across 5 demo tickers (AAPL, MSFT, GOOGL, AMZN, META)
+
+**Root cause:** `_extract_transcript_text` was scoring keywords against `response.text[:8000]` — raw HTML. AMZN's EX-99.1 exhibits are ~578KB HTML files with heavy inline CSS and SEC boilerplate. All financial keywords (`"revenue"`, `"per share"`, `"conference call"`) existed in the document but appeared well past the 8000-char raw HTML window. Result: AMZN scored 0 on all 8 filings → all skipped.
+
+**Fix applied to:** `ml-sidecar/src/services/ingestion_service.py` — `_extract_transcript_text`
+
+**Change:** Strip HTML via BeautifulSoup first, score plain text preview instead of raw HTML. Also eliminated duplicate BeautifulSoup parse calls (previously parsed once per branch; now parsed once and reused).
+
+**Before:**
+```python
+preview = response.text[:8000].lower()
+score = ...
+if score >= 3:
+    pass
+elif score >= 1:
+    soup = BeautifulSoup(response.text, "lxml")  # parse #1
+    ...
+    return cleaned, "PRESS_RELEASE"
+soup = BeautifulSoup(response.text, "lxml")  # parse #2
+...
+return cleaned, "SUCCESS"
+```
+
+**After:**
+```python
+soup = BeautifulSoup(response.text, "lxml")   # parse once
+raw = soup.get_text(separator="\n", strip=True)
+cleaned = re.sub(r"\n{3,}", "\n\n", raw)
+preview = cleaned[:8000].lower()              # score plain text
+score = ...
+if score >= 3:
+    return cleaned, "SUCCESS"
+elif score >= 1:
+    return cleaned, "PRESS_RELEASE"
+else:
+    return None, "NO_TRANSCRIPT"
+```
+
+**Impact across 5 demo tickers:**
+
+| Ticker | Before | After |
+|---|---|---|
+| AAPL | 9 transcripts | 9 transcripts — unchanged |
+| MSFT | 0 transcripts / 7 press releases | 7 transcripts / 0 press releases |
+| GOOGL | 0 transcripts / 11 press releases | 11 transcripts / 0 press releases |
+| AMZN | 0 press releases / 8 skipped | 6 press releases / 2 skipped |
+| META | 0 transcripts / 6 press releases | 6 transcripts / 0 press releases |
+
+All 133 tests pass (130 original + 3 added by post-close review patches).
+
 ### File List
 
 - ml-sidecar/src/models/ingestion_models.py
