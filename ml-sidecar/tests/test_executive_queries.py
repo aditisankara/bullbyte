@@ -35,6 +35,15 @@ async def test_get_executive_at_date_not_found():
     assert result is None
 
 
+async def test_get_executive_at_date_end_date_exclusive():
+    """Returns None when the queried date is after the executive's end_date."""
+    mock_pool = AsyncMock()
+    mock_pool.fetchrow = AsyncMock(return_value=None)
+    with patch("src.db.queries.get_pool", return_value=mock_pool):
+        result = await get_executive_at_date("AAPL", "CEO", "2025-01-01")
+    assert result is None
+
+
 async def test_get_executive_at_date_query_passes_correct_params():
     """fetchrow is called with ticker, role, and date as positional args in correct order."""
     mock_pool = AsyncMock()

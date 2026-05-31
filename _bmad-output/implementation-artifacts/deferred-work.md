@@ -138,6 +138,10 @@ score ≥ 3 → `SUCCESS`, score 1–2 → `PRESS_RELEASE`, score 0 → `NO_TRAN
   ahead of the earnings one, or the earnings 8-K has a different exhibit structure.
   Investigate by fetching the Q3-2024 8-K index directly from EDGAR for accession number.
 
+## Deferred from: code review of 3-8-executive-tenure-schema (2026-05-31)
+
+- No partial unique index on `(company_id, role) WHERE end_date IS NULL` in `executives` table — nothing prevents two simultaneous active "CEO" rows for the same company; `ORDER BY start_date DESC LIMIT 1` picks one silently. Low risk for schema-only story but will cause silent data integrity issues when rows are inserted; add `CREATE UNIQUE INDEX idx_executives_active_role ON executives (company_id, role) WHERE end_date IS NULL` before the first data seeding in Epic 4.
+
 ## Deferred from: code review of 3-4-temporal-alignment-engine (2026-05-27)
 
 - `acc_no.replace("-", "")` has no accession number format validation [temporal_aligner.py] — pre-existing pattern in financials_service.py; EDGAR is reliable source; scope creep for 3.4

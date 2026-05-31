@@ -1,6 +1,6 @@
 # Story 3.8: Executive Tenure Schema
 
-Status: review
+Status: done
 
 ## Story
 
@@ -130,6 +130,11 @@ So that Epic 4's CEO delivery score (story 4.6) can roll up per-quarter verdicts
     ```
   - [x] Test 2: `test_get_executive_at_date_not_found` — `fetchrow` returns `None`, assert result is `None`
   - [x] Test 3: `test_get_executive_at_date_query_passes_correct_params` — assert `fetchrow` called with ticker, role, and date as positional args in correct order
+
+### Review Findings
+
+- [x] [Review][Patch] Missing `test_get_executive_at_date_end_date_exclusive` test [ml-sidecar/tests/test_executive_queries.py] — AC6 explicitly names this test as required. The implementation substituted `test_get_executive_at_date_query_passes_correct_params` instead. Add a test that passes a date strictly after `end_date` and asserts `None` is returned.
+- [x] [Review][Defer] No partial unique index on `(company_id, role) WHERE end_date IS NULL` [api/src/db/schema.ts / migration] — deferred, pre-existing design gap; nothing prevents two active "CEO" rows for the same company; `ORDER BY start_date DESC LIMIT 1` silently picks one. Acceptable for schema-only story; revisit before first data seeding in Epic 4.
 
 ## Dev Notes
 
