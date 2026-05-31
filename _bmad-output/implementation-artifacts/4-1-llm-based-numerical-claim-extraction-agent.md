@@ -1,6 +1,6 @@
 # Story 4.1: LLM-Based Numerical Claim Extraction Agent
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -39,43 +39,43 @@ Then a structured log entry is emitted with: `model`, `tokens_used`, `estimated_
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create Pydantic models in `ml-sidecar/src/models/claim_models.py` (AC: 1, 2)
-  - [ ] Define `ClaimType` Literal: `"revenue"`, `"earnings"`, `"margin"`, `"guidance"`, `"growth"`, `"other"`
-  - [ ] Define `ExtractedClaim` model: `raw_quote: str`, `claim_type: ClaimType`, `metric: str`, `target_value: str`, `target_unit: str | None`, `timeframe: str`, `speaker: str | None`, `quarter: str`
-  - [ ] Define `ExtractionError` model: `raw_segment: str`, `error_reason: str`
-  - [ ] Define `ExtractionResult` model: `claims: list[ExtractedClaim]`, `errors: list[ExtractionError]`, `ticker: str`, `quarter: str`
-  - [ ] Apply `model_config = ConfigDict(alias_generator=to_camel)` so models serialize to camelCase over HTTP
+- [x] Task 1: Create Pydantic models in `ml-sidecar/src/models/claim_models.py` (AC: 1, 2)
+  - [x] Define `ClaimType` Literal: `"revenue"`, `"earnings"`, `"margin"`, `"guidance"`, `"growth"`, `"other"`
+  - [x] Define `ExtractedClaim` model: `raw_quote: str`, `claim_type: ClaimType`, `metric: str`, `target_value: str`, `target_unit: str | None`, `timeframe: str`, `speaker: str | None`, `quarter: str`
+  - [x] Define `ExtractionError` model: `raw_segment: str`, `error_reason: str`
+  - [x] Define `ExtractionResult` model: `claims: list[ExtractedClaim]`, `errors: list[ExtractionError]`, `ticker: str`, `quarter: str`
+  - [x] Apply `model_config = ConfigDict(alias_generator=to_camel)` so models serialize to camelCase over HTTP
 
 - [ ] Task 2: Implement `extraction_service.py` in `ml-sidecar/src/services/` (AC: 1, 2, 3, 4)
-  - [ ] Import only from `src.core.llm.base` — never import `anthropic` or `openai` directly
-  - [ ] Build system prompt instructing the LLM to extract forward-looking numerical claims as JSON
-  - [ ] Include in the prompt: claim format schema, definition of "forward-looking", instruction to skip safe-harbour boilerplate (pure extraction — confidence filtering is story 4.2's scope)
-  - [ ] Call `get_provider().complete(messages)` with the transcript text as user message
-  - [ ] Parse LLM JSON response into `list[ExtractedClaim]`; on parse failure wrap raw segment in `ExtractionError`
-  - [ ] Return `ExtractionResult` with populated `claims` and `errors` lists
-  - [ ] Emit cost log after every LLM call: `{ model, tokens_used, estimated_cost_usd, ticker, jobId, service: "ml-sidecar", timestamp }` via `get_logger()`
-  - [ ] `extraction_service.py` must not import `asyncpg` — DB persistence is a caller responsibility
+  - [x] Import only from `src.core.llm.base` — never import `anthropic` or `openai` directly
+  - [x] Build system prompt instructing the LLM to extract forward-looking numerical claims as JSON
+  - [x] Include in the prompt: claim format schema, definition of "forward-looking", instruction to skip safe-harbour boilerplate (pure extraction — confidence filtering is story 4.2's scope)
+  - [x] Call `get_provider().complete(messages)` with the transcript text as user message
+  - [x] Parse LLM JSON response into `list[ExtractedClaim]`; on parse failure wrap raw segment in `ExtractionError`
+  - [x] Return `ExtractionResult` with populated `claims` and `errors` lists
+  - [x] Emit cost log after every LLM call: `{ model, tokens_used, estimated_cost_usd, ticker, jobId, service: "ml-sidecar", timestamp }` via `get_logger()`
+  - [x] `extraction_service.py` must not import `asyncpg` — DB persistence is a caller responsibility
 
 - [ ] Task 3: Add asyncpg claim persistence helper to `ml-sidecar/src/db/queries.py` (AC: 3)
-  - [ ] `insert_claim()` already exists — verify it accepts all required fields from `ExtractedClaim`
-  - [ ] Schema check: `claims` table has `raw_quote`, `metric`, `target_value`, `extraction_confidence`, `speaker`, `quarter`, `company_id` — note `claim_type`, `target_unit`, `timeframe` are **not** in the schema; store `claim_type` + `target_unit` + `timeframe` in `target_value` as a structured string or persist them as-is into available columns (see Dev Notes — schema gap)
-  - [ ] Add `insert_claim_batch(claims: list[dict]) -> list[str]` for bulk inserts within a single transaction
+  - [x] `insert_claim()` already exists — verify it accepts all required fields from `ExtractedClaim`
+  - [x] Schema check: `claims` table has `raw_quote`, `metric`, `target_value`, `extraction_confidence`, `speaker`, `quarter`, `company_id` — note `claim_type`, `target_unit`, `timeframe` are **not** in the schema; store `claim_type` + `target_unit` + `timeframe` in `target_value` as a structured string or persist them as-is into available columns (see Dev Notes — schema gap)
+  - [x] Add `insert_claim_batch(claims: list[dict]) -> list[str]` for bulk inserts within a single transaction
 
 - [ ] Task 4: Wire extraction into `analysis_router.py` (AC: 3, 4)
-  - [ ] Replace the stub `POST /analyze/{ticker}` with a real implementation that:
+  - [x] Replace the stub `POST /analyze/{ticker}` with a real implementation that:
     - Fetches cached transcripts from DB for the ticker (query `transcripts` table)
     - Calls `extraction_service.extract_claims(transcript_text, ticker, quarter, job_id)` per transcript
     - Persists each `ExtractedClaim` to DB via `insert_claim_batch()`
     - Sends `claims-extracted` progress webhook after each quarter completes
-  - [ ] Accept `jobId` in the request body (already needed by progress webhooks — see story 5.3 pattern)
-  - [ ] Keep the endpoint non-blocking: use `BackgroundTasks` or run extraction inline (sidecar is synchronous per ticker)
+  - [x] Accept `jobId` in the request body (already needed by progress webhooks — see story 5.3 pattern)
+  - [x] Keep the endpoint non-blocking: use `BackgroundTasks` or run extraction inline (sidecar is synchronous per ticker)
 
 - [ ] Task 5: Write tests in `ml-sidecar/tests/test_extraction.py` (AC: 1, 2, 3, 4)
-  - [ ] `test_extraction_returns_structured_claims` — mock `get_provider()`, feed transcript fixture, assert `ExtractedClaim` fields populated
-  - [ ] `test_extraction_no_silent_drops` — LLM returns partial JSON for one claim; assert `ExtractionError` emitted for bad segment, valid claims still returned
-  - [ ] `test_llm_called_via_abstraction_only` — assert `anthropic` and `openai` not imported in `extraction_service` module
-  - [ ] `test_cost_log_emitted_after_llm_call` — capture log output, assert required fields present
-  - [ ] `test_insert_claim_batch_persists_all` — mock asyncpg pool, assert batch insert called once per claim
+  - [x] `test_extraction_returns_structured_claims` — mock `get_provider()`, feed transcript fixture, assert `ExtractedClaim` fields populated
+  - [x] `test_extraction_no_silent_drops` — LLM returns partial JSON for one claim; assert `ExtractionError` emitted for bad segment, valid claims still returned
+  - [x] `test_llm_called_via_abstraction_only` — assert `anthropic` and `openai` not imported in `extraction_service` module
+  - [x] `test_cost_log_emitted_after_llm_call` — capture log output, assert required fields present
+  - [x] `test_insert_claim_batch_persists_all` — mock asyncpg pool, assert batch insert called once per claim
 
 ## Dev Notes
 
@@ -228,6 +228,28 @@ claude-sonnet-4-6 (story creation via bmad-create-story, 2026-05-31)
 
 ### Debug Log References
 
+None — implementation completed without blockers.
+
 ### Completion Notes List
 
+- Created `claim_models.py` with `ClaimType`, `ExtractedClaim`, `ExtractionError`, `ExtractionResult` Pydantic v2 models; all use `ConfigDict(alias_generator=to_camel)` for camelCase JSON serialisation.
+- Implemented `extraction_service.py` with deterministic extraction prompt, `_parse_llm_response()` that never silently drops claims (failures produce `ExtractionError`), and per-call cost logging with `_estimate_cost()` helper.
+- Added `insert_claim_batch()` (bulk transactional insert) and `get_company_id_by_ticker()` and `get_all_transcripts_for_ticker()` to `queries.py`; `# TODO story 4.x` comments mark the missing DB columns.
+- Replaced stub `analysis_router.py` with real `BackgroundTasks`-based implementation: fetches transcripts, calls extraction service per quarter, persists claims, sends progress webhooks.
+- Updated `test_analyze.py` to match the new router signature (requires `jobId` body).
+- Wrote 7 new tests in `test_extraction.py` covering all 4 ACs; all pass.
+- 18 pre-existing failures in `test_ingestion.py` / `test_yfinance_service.py` (lxml and yfinance not installed in local env) confirmed unchanged by git stash comparison.
+
 ### File List
+
+- `ml-sidecar/src/models/claim_models.py` (new)
+- `ml-sidecar/src/services/extraction_service.py` (new)
+- `ml-sidecar/tests/test_extraction.py` (new)
+- `ml-sidecar/src/db/queries.py` (modified)
+- `ml-sidecar/src/routers/analysis_router.py` (modified)
+- `ml-sidecar/tests/test_analyze.py` (modified)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified)
+
+## Change Log
+
+- 2026-05-31: Implemented story 4.1 — LLM-based numerical claim extraction agent. Created Pydantic claim models, extraction service with structured prompt and cost logging, bulk DB insert helper, real analysis router with BackgroundTasks, and 7 unit tests covering all ACs. (claude-sonnet-4-6)
