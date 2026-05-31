@@ -108,6 +108,36 @@ score ≥ 3 → `SUCCESS`, score 1–2 → `PRESS_RELEASE`, score 0 → `NO_TRAN
 - `parse_status` column in `transcripts` table has no `CHECK` constraint — text column accepts any value; no DB-level enum enforcement [api/src/db/schema.ts:169]; address in a schema hardening story
 - No `TranscriptResult` appended when `_get_exhibit_documents` returns an empty list — creates inconsistency with other failure paths (index FETCH_ERROR does append a result); pre-existing pattern, low impact [ingestion_service.py:314]; address in a future result-consistency story
 
+## Deferred from: 3-7 manual testing and data strategy brainstorm (2026-05-31)
+
+- **8-K keyword scorer fix applied (not a story — hotfix):** `_extract_transcript_text` in
+  `ingestion_service.py` was scoring keywords against raw HTML (`response.text[:8000]`).
+  Fixed to strip HTML via BeautifulSoup first, then score plain text. Result: MSFT/GOOGL/META
+  reclassified from PRESS_RELEASE → SUCCESS; AMZN went from 8 skipped → 6 PRESS_RELEASE.
+  All 133 tests pass. No story needed — change is already in `ingestion_service.py`.
+
+- **Multi-8-K-per-quarter caching: first-filing-wins may cache wrong document** —
+  Pipeline processes 8-Ks in filing-date order and caches the first result per
+  `ticker+quarter`. If a non-earnings 8-K filed earlier in the quarter accidentally
+  scores ≥1 keyword, it gets cached and the actual earnings press release is never
+  processed for that quarter. Low probability for current 5 demo tickers (non-earnings
+  8-Ks typically score 0) but a real risk at scale. Fix options: filter by 8-K item type
+  (item 2.02 = earnings results), or use exhibit description labels from the filing index
+  instead of keyword scoring. Revisit before expanding beyond demo tickers.
+
+- **`press_releases_extracted` counter double-counts cache hits** — the summary counter
+  increments for both new DB inserts and cache hits on PRESS_RELEASE rows (by design from
+  3.7 review patch). This causes the ingestion summary to report more press releases than
+  rows actually inserted (observed: counter=6, DB rows=3 for AMZN). Misleading for
+  monitoring. Consider splitting into `press_releases_inserted` vs `press_releases_cached`
+  in a future observability story.
+
+- **AMZN Q3-2024 still skipped** — 2 AMZN quarters remain as NO_TRANSCRIPT after the
+  hotfix. Q4-2024 is explained by the test script's `end_date="2024-12-31"` cutoff
+  (earnings filed Feb 2025). Q3-2024 cause unknown — likely a non-earnings 8-K cached
+  ahead of the earnings one, or the earnings 8-K has a different exhibit structure.
+  Investigate by fetching the Q3-2024 8-K index directly from EDGAR for accession number.
+
 ## Deferred from: code review of 3-4-temporal-alignment-engine (2026-05-27)
 
 - `acc_no.replace("-", "")` has no accession number format validation [temporal_aligner.py] — pre-existing pattern in financials_service.py; EDGAR is reliable source; scope creep for 3.4
