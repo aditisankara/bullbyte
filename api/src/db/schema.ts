@@ -205,3 +205,27 @@ export const financialActuals = pgTable(
 
 export type FinancialActuals = typeof financialActuals.$inferSelect;
 export type NewFinancialActuals = typeof financialActuals.$inferInsert;
+
+export const executives = pgTable(
+	'executives',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		personName: text('person_name').notNull(),
+		companyId: uuid('company_id')
+			.notNull()
+			.references(() => companies.id, { onDelete: 'cascade' }),
+		role: text('role').notNull(),
+		startDate: text('start_date').notNull(),
+		endDate: text('end_date'),
+		createdAt: timestamp('created_at', { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		index('idx_executives_company_role').on(t.companyId, t.role),
+		index('idx_executives_person_name').on(t.personName),
+	]
+);
+
+export type Executive = typeof executives.$inferSelect;
+export type NewExecutive = typeof executives.$inferInsert;

@@ -15,6 +15,13 @@
       "when": 1779978155417,
       "tag": "0001_wakeful_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780201436575,
+      "tag": "0002_yielding_phil_sheldon",
+      "breakpoints": true
     }
   ]
 }
