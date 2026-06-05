@@ -6,6 +6,7 @@ Imports only from src.core.llm.base — never imports anthropic or openai direct
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 
 from src.core.llm.base import LLMResponse, get_provider
@@ -77,11 +78,12 @@ def _parse_llm_response(
         errors.append(ExtractionError(raw_segment="", error_reason="LLM returned empty response"))
         return claims, errors
 
-    # Strip markdown code fences if present
+    # Strip markdown code fences if present (handles ```json\n...\n``` and ```...\n``` and ```...```)
     text = response.content.strip()
     if text.startswith("```"):
-        lines = text.splitlines()
-        text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+        # Only strip an optional language identifier (word chars), not JSON content
+        text = re.sub(r"^```\w*\n?", "", text)
+        text = re.sub(r"\n?```\s*$", "", text).strip()
 
     try:
         raw_list = json.loads(text)
@@ -111,7 +113,7 @@ def _parse_llm_response(
             continue
         # Use provided quarter if the LLM omitted it
         if "quarter" not in item or not item["quarter"]:
-            item["quarter"] = quarter
+            item = {**item, "quarter": quarter}
         try:
             claims.append(ExtractedClaim(**item))
         except Exception as exc:
@@ -145,7 +147,7 @@ async def extract_claims(
 
     response: LLMResponse = await provider.complete(messages=messages)
 
-    # AC4: emit cost log after every LLM call
+    # AC4: emit cost log after every LLM call (formatter injects service + timestamp)
     logger.info(
         "LLM call completed",
         extra={
@@ -156,7 +158,6 @@ async def extract_claims(
             ),
             "ticker": ticker,
             "jobId": job_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
         },
     )
 

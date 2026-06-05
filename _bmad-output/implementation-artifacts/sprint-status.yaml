@@ -49,7 +49,7 @@
 # that doesn't conflict with the other developer's active story.
 
 generated: "2026-05-01"
-last_updated: "2026-05-31"  # story 1.1 + 1.3 + 1.5 + 1.6 done; Epic 1 complete; 3.1 done; 3.2 done; 3.3 done; 3.4 done; 3.5 done; 3.6 done; 3.7 + 3.8 added (press release fallback, executive tenure schema); Epic 3 re-opened; 3.7 done; Epic 4 started; 4.1 ready-for-dev
+last_updated: "2026-05-31"  # story 1.1 + 1.3 + 1.5 + 1.6 done; Epic 1 complete; 3.1 done; 3.2 done; 3.3 done; 3.4 done; 3.5 done; 3.6 done; 3.7 + 3.8 added (press release fallback, executive tenure schema); Epic 3 re-opened; 3.7 done; Epic 4 started; 4.1 done
 project: bullbyte
 project_key: NOKEY
 tracking_system: file-system
@@ -120,7 +120,7 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   epic-4: in-progress
 
-  4-1-llm-based-numerical-claim-extraction-agent: review     # needs 1.3 + Epic 3
+  4-1-llm-based-numerical-claim-extraction-agent: done       # needs 1.3 + Epic 3
   4-2-safe-harbour-boilerplate-filter-and-extraction-confidence-scoring: backlog  # needs 4.1
   4-3-claim-verification-agent-verdict-engine: backlog              # needs 4.1 + 3.x
   4-4-quantitative-delta-calculation-and-verification-confidence-scoring: backlog # needs 4.3

@@ -1,11 +1,14 @@
 """Pydantic models for numerical claim extraction (story 4.1)."""
 
+import re
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from pydantic.alias_generators import to_camel
 
 ClaimType = Literal["revenue", "earnings", "margin", "guidance", "growth", "other"]
+
+_QUARTER_RE = re.compile(r"^Q[1-4]-\d{4}$")
 
 
 class ExtractedClaim(BaseModel):
@@ -19,6 +22,13 @@ class ExtractedClaim(BaseModel):
     timeframe: str
     speaker: str | None = None
     quarter: str
+
+    @field_validator("quarter")
+    @classmethod
+    def quarter_format(cls, v: str) -> str:
+        if not _QUARTER_RE.match(v):
+            raise ValueError(f"quarter must match Q[1-4]-YYYY, got: {v!r}")
+        return v
 
 
 class ExtractionError(BaseModel):

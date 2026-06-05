@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: code review of 4-1-llm-based-numerical-claim-extraction-agent (2026-05-31)
+
+- Unbounded transcript `raw_text` size sent to LLM without token/character guard [`ml-sidecar/src/routers/analysis_router.py`] — transcript size is bounded by EDGAR/press-release ingestion; a hard cap + warning belongs in a later performance/reliability story
+- No idempotency in `insert_claim_batch` — re-running `/analyze/{ticker}` duplicates all claims in DB [`ml-sidecar/src/db/queries.py`] — requires a unique index on `(company_id, quarter, metric, raw_quote)` and `ON CONFLICT DO NOTHING`; schema change deferred to avoid unplanned migration in this story
+- Ticker path parameter has no regex validation — arbitrary strings reach DB [`ml-sidecar/src/routers/analysis_router.py`] — input validation at the API gateway layer is a cross-cutting concern; address in a dedicated validation/hardening story
+
 ## Deferred from: code review of 1-2-postgresql-schema-and-drizzle-migration-infrastructure (2026-05-06)
 
 - Missing FK indexes on `analysis_jobs.company_id`, `verdicts.claim_id`, `reasoning_traces.verdict_id`, `tool_call_logs.job_id` — only `idx_claims_company_id` required by current spec; add remaining FK indexes in a future performance story

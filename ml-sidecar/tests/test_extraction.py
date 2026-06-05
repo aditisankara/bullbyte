@@ -284,3 +284,49 @@ async def test_insert_claim_batch_empty_returns_empty():
 
     result = await insert_claim_batch([])
     assert result == []
+
+
+# ---------------------------------------------------------------------------
+# Test: code-fence stripping — single-line fence edge case (P6)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_single_line_code_fence_stripped():
+    """LLM response wrapped in a single-line ```...``` must still parse correctly."""
+    # Simulate LLM wrapping the array in fences with no language identifier and no trailing newline
+    single_line_fenced = "```" + VALID_LLM_JSON.strip() + "```"
+    mock_provider = _make_mock_provider(single_line_fenced)
+
+    with patch("src.core.llm.base._provider", mock_provider):
+        from src.services.extraction_service import extract_claims
+
+        result = await extract_claims(
+            transcript_text=TRANSCRIPT_FIXTURE,
+            ticker="AAPL",
+            quarter="Q2-2024",
+            job_id="test-job-fence",
+        )
+
+    assert len(result.claims) == 2
+    assert len(result.errors) == 0
+
+
+# ---------------------------------------------------------------------------
+# Test: quarter format validator (P8)
+# ---------------------------------------------------------------------------
+
+
+def test_extracted_claim_rejects_malformed_quarter():
+    from src.models.claim_models import ExtractedClaim
+    import pytest
+
+    with pytest.raises(Exception, match="quarter"):
+        ExtractedClaim(
+            raw_quote="We expect Q3 revenue to be $120B",
+            claim_type="revenue",
+            metric="Q3 revenue",
+            target_value="120",
+            timeframe="Q3 2024",
+            quarter="Q3 2024",  # space instead of dash — invalid
+        )

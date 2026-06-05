@@ -1,6 +1,6 @@
 # Story 4.1: LLM-Based Numerical Claim Extraction Agent
 
-Status: review
+Status: done
 
 ## Story
 
@@ -249,6 +249,21 @@ None — implementation completed without blockers.
 - `ml-sidecar/src/routers/analysis_router.py` (modified)
 - `ml-sidecar/tests/test_analyze.py` (modified)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified)
+
+### Review Findings
+
+- [x] [Review][Patch] Unhandled exceptions in `_run_extraction` silently drop the job — no `analysis-failed` event emitted [`ml-sidecar/src/routers/analysis_router.py`]
+- [x] [Review][Patch] `_TOTAL_STEPS = 3` hardcoded but `stepIndex` increments once per transcript — overflows for tickers with >2 transcripts [`ml-sidecar/src/routers/analysis_router.py`]
+- [x] [Review][Patch] `raw_text` from transcript not guarded for None/empty before LLM call — wastes tokens [`ml-sidecar/src/routers/analysis_router.py`]
+- [x] [Review][Patch] `claims-extracted` progress event emitted even when zero claims were extracted for a quarter [`ml-sidecar/src/routers/analysis_router.py`]
+- [x] [Review][Patch] `timestamp` explicitly in `extra` dict — formatter already adds it, causes duplicate field [`ml-sidecar/src/services/extraction_service.py`]
+- [x] [Review][Patch] Code-fence stripping fails on single-line ` ```[...]``` ` response — entire content dropped [`ml-sidecar/src/services/extraction_service.py`]
+- [x] [Review][Patch] Dict mutation `item["quarter"] = quarter` in `_parse_llm_response` — should copy instead [`ml-sidecar/src/services/extraction_service.py`]
+- [x] [Review][Patch] No `quarter` field format validation on `ExtractedClaim` — malformed values persist silently [`ml-sidecar/src/models/claim_models.py`]
+- [x] [Review][Patch] No test for exception path inside `_run_extraction` (verifies `analysis-failed` emitted on error) [`ml-sidecar/tests/test_analyze.py`]
+- [x] [Review][Defer] Unbounded transcript `raw_text` size sent to LLM — no token/character guard [`ml-sidecar/src/routers/analysis_router.py`] — deferred, pre-existing
+- [x] [Review][Defer] No idempotency in `insert_claim_batch` — re-running analysis duplicates claims [`ml-sidecar/src/db/queries.py`] — deferred, pre-existing
+- [x] [Review][Defer] Ticker path parameter has no regex validation — arbitrary strings reach DB [`ml-sidecar/src/routers/analysis_router.py`] — deferred, pre-existing
 
 ## Change Log
 
