@@ -20,7 +20,9 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const footer = (fixture.nativeElement as HTMLElement).querySelector('footer');
-    expect(footer?.textContent).toContain('Not financial advice. Data sourced from public SEC filings.');
+    expect(footer?.textContent).toContain(
+      'Not financial advice. Data sourced from public SEC filings via EDGAR.',
+    );
   });
 
   it('should contain a router-outlet', () => {
