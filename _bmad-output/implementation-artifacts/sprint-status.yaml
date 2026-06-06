@@ -49,7 +49,7 @@
 # that doesn't conflict with the other developer's active story.
 
 generated: "2026-05-01"
-last_updated: "2026-05-31"  # story 1.1 + 1.3 + 1.5 + 1.6 done; Epic 1 complete; 3.1 done; 3.2 done; 3.3 done; 3.4 done; 3.5 done; 3.6 done; 3.7 + 3.8 added (press release fallback, executive tenure schema); Epic 3 re-opened; 3.7 done; Epic 4 started; 4.1 done
+last_updated: "2026-06-05"  # story 1.1 + 1.3 + 1.5 + 1.6 done; Epic 1 complete; 3.1–3.7 done; 3.8 ready-for-dev; Epic 4 started; 4.1 done; 2.1–2.6 done + merged to main (PR #82); Epic 2 complete; 5.1–5.4 done; Epic 6 unblocked (6.1 + 6.2)
 project: bullbyte
 project_key: NOKEY
 tracking_system: file-system
@@ -84,14 +84,14 @@ development_status:
   # PRIORITY: Fully independent. Runs in parallel with Epics 3–5.
   # Must complete before Epic 6 frontend implementation begins.
   # ─────────────────────────────────────────────────────────────
-  epic-2: in-progress
+  epic-2: done
 
-  2-1-design-token-system: review                     # token gaps closed; all 5 verdict pairs verified AA
-  2-2-core-shared-component-specs: review             # 4 shared components + tests; suite 24/24 green
-  2-3-search-page-and-analysis-progress-feed-specs: review  # SearchInput + AnalysisProgressFeed + SSE mirror; 38/38 green
-  2-4-promise-timeline-and-claim-card-specs: review  # PromiseTimeline + ClaimCard + breakpoints; 52/52 green
-  2-5-claim-detail-panel-and-reasoning-trace-specs: review  # ClaimDetailPanel + ReasoningTrace; 62/62 green
-  2-6-ceo-score-card-and-responsive-layout-specs: review    # CeoScoreCard + CompanyPageLayout + capstone matrix; 72/72 green
+  2-1-design-token-system: done                     # token gaps closed; all 5 verdict pairs verified AA (PR #72)
+  2-2-core-shared-component-specs: done             # 4 shared components + tests; suite 24/24 green (PR #73)
+  2-3-search-page-and-analysis-progress-feed-specs: done  # SearchInput + AnalysisProgressFeed + SSE mirror; 38/38 green (PR #74)
+  2-4-promise-timeline-and-claim-card-specs: done  # PromiseTimeline + ClaimCard + breakpoints; 52/52 green (PR #75)
+  2-5-claim-detail-panel-and-reasoning-trace-specs: done  # ClaimDetailPanel + ReasoningTrace; 62/62 green (PR #76)
+  2-6-ceo-score-card-and-responsive-layout-specs: done    # CeoScoreCard + CompanyPageLayout + capstone matrix; 72/72 green (PR #77)
 
   epic-2-retrospective: optional
 
@@ -136,10 +136,10 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   epic-5: in-progress
 
-  5-1-bullmq-async-analysis-job-queue: ready-for-dev     # needs 1.4; story drafted + module scaffolded
-  5-2-sse-progress-stream-endpoint: backlog              # needs 5.1
-  5-3-fastapi-to-nestjs-webhook-progress-relay: review   # needs 5.2 + 1.3
-  5-4-company-and-search-api-endpoints: backlog          # needs 1.4; parallel with 5.1
+  5-1-bullmq-async-analysis-job-queue: done              # needs 1.4 (PR #28)
+  5-2-sse-progress-stream-endpoint: done                 # needs 5.1 (PR #64)
+  5-3-fastapi-to-nestjs-webhook-progress-relay: done     # needs 5.2 + 1.3 (PR #69)
+  5-4-company-and-search-api-endpoints: done             # needs 1.4; parallel with 5.1 (PR #63)
   5-5-claims-timeline-and-claim-detail-api-endpoints: backlog  # needs 5.4 + Epic 4
   5-6-ceo-score-endpoint-and-immutable-verdict-writes: backlog # needs 4.6 + 5.4
 
@@ -153,8 +153,8 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   epic-6: backlog
 
-  6-1-ticker-search-component-and-company-page-routing: backlog  # needs 1.5 + 5.4
-  6-2-analysis-progress-feed-component-sse: backlog              # needs 1.5 + 5.2
+  6-1-ticker-search-component-and-company-page-routing: ready-for-dev  # needs 1.5 + 5.4 — both done; unblocked
+  6-2-analysis-progress-feed-component-sse: ready-for-dev              # needs 1.5 + 5.2 — both done; unblocked
   6-3-promise-timeline-component-with-verdict-status: backlog    # needs 1.5 + 5.5
   6-4-ceo-delivery-score-card-component: backlog                 # needs 1.5 + 5.6
   6-5-claim-detail-panel-component: backlog                      # needs 1.5 + 5.5
