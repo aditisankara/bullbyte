@@ -29,42 +29,51 @@ Luca Maestri - CFO: We anticipate gross margin of approximately 46 percent for t
 that could cause actual results to differ materially from those projected.]
 """
 
-VALID_LLM_JSON = """[
-  {
-    "raw_quote": "We expect Q3 revenue to be approximately $120 billion",
-    "claim_type": "revenue",
-    "metric": "Q3 revenue",
-    "target_value": "120",
-    "target_unit": "billion USD",
-    "timeframe": "Q3 2024",
-    "speaker": "Tim Cook - CEO",
-    "quarter": "Q2-2024"
-  },
-  {
-    "raw_quote": "We anticipate gross margin of approximately 46 percent for the September quarter",
-    "claim_type": "margin",
-    "metric": "gross margin",
-    "target_value": "46",
-    "target_unit": "percent",
-    "timeframe": "Q3 2024",
-    "speaker": "Luca Maestri - CFO",
-    "quarter": "Q2-2024"
-  }
-]"""
+VALID_LLM_JSON = """{
+  "claims": [
+    {
+      "raw_quote": "We expect Q3 revenue to be approximately $120 billion",
+      "claim_type": "revenue",
+      "metric": "Q3 revenue",
+      "target_value": "120",
+      "target_unit": "billion USD",
+      "timeframe": "Q3 2024",
+      "speaker": "Tim Cook - CEO",
+      "quarter": "Q2-2024",
+      "extraction_confidence": 0.85
+    },
+    {
+      "raw_quote": "We anticipate gross margin of approximately 46 percent for the September quarter",
+      "claim_type": "margin",
+      "metric": "gross margin",
+      "target_value": "46",
+      "target_unit": "percent",
+      "timeframe": "Q3 2024",
+      "speaker": "Luca Maestri - CFO",
+      "quarter": "Q2-2024",
+      "extraction_confidence": 0.75
+    }
+  ],
+  "boilerplate": []
+}"""
 
-PARTIAL_LLM_JSON = """[
-  {
-    "raw_quote": "We expect Q3 revenue to be approximately $120 billion",
-    "claim_type": "revenue",
-    "metric": "Q3 revenue",
-    "target_value": "120",
-    "target_unit": "billion USD",
-    "timeframe": "Q3 2024",
-    "speaker": "Tim Cook - CEO",
-    "quarter": "Q2-2024"
-  },
-  "this is not a valid object"
-]"""
+PARTIAL_LLM_JSON = """{
+  "claims": [
+    {
+      "raw_quote": "We expect Q3 revenue to be approximately $120 billion",
+      "claim_type": "revenue",
+      "metric": "Q3 revenue",
+      "target_value": "120",
+      "target_unit": "billion USD",
+      "timeframe": "Q3 2024",
+      "speaker": "Tim Cook - CEO",
+      "quarter": "Q2-2024",
+      "extraction_confidence": 0.85
+    },
+    "this is not a valid object"
+  ],
+  "boilerplate": []
+}"""
 
 
 def _make_mock_provider(content: str) -> MagicMock:
@@ -120,6 +129,7 @@ async def test_extraction_returns_structured_claims():
     assert first.speaker == "Tim Cook - CEO"
     assert first.quarter == "Q2-2024"
 
+    assert first.extraction_confidence >= Decimal("0.80")
     assert len(result.errors) == 0
     assert result.ticker == "AAPL"
     assert result.quarter == "Q2-2024"
@@ -257,7 +267,7 @@ async def test_insert_claim_batch_persists_all():
             "raw_quote": "We expect Q3 revenue to be approximately $120 billion",
             "metric": "Q3 revenue",
             "target_value": "120",
-            "extraction_confidence": Decimal("0.5"),
+            "extraction_confidence": Decimal("0.85"),
             "speaker": "Tim Cook - CEO",
         },
         {
@@ -266,7 +276,7 @@ async def test_insert_claim_batch_persists_all():
             "raw_quote": "We anticipate gross margin of approximately 46 percent",
             "metric": "gross margin",
             "target_value": "46",
-            "extraction_confidence": Decimal("0.5"),
+            "extraction_confidence": Decimal("0.85"),
             "speaker": "Luca Maestri - CFO",
         },
     ]
@@ -329,4 +339,5 @@ def test_extracted_claim_rejects_malformed_quarter():
             target_value="120",
             timeframe="Q3 2024",
             quarter="Q3 2024",  # space instead of dash — invalid
+            extraction_confidence=Decimal("0.85"),
         )

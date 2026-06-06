@@ -133,7 +133,7 @@ async def _do_extraction(ticker: str, job_id: str) -> None:
                     "raw_quote": claim.raw_quote,
                     "metric": claim.metric,
                     "target_value": claim.target_value,
-                    "extraction_confidence": Decimal("0.5"),
+                    "extraction_confidence": Decimal(str(claim.extraction_confidence)),
                     "speaker": claim.speaker,
                 }
                 for claim in result.claims

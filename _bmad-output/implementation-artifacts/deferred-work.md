@@ -148,6 +148,11 @@ score ≥ 3 → `SUCCESS`, score 1–2 → `PRESS_RELEASE`, score 0 → `NO_TRAN
 
 - No partial unique index on `(company_id, role) WHERE end_date IS NULL` in `executives` table — nothing prevents two simultaneous active "CEO" rows for the same company; `ORDER BY start_date DESC LIMIT 1` picks one silently. Low risk for schema-only story but will cause silent data integrity issues when rows are inserted; add `CREATE UNIQUE INDEX idx_executives_active_role ON executives (company_id, role) WHERE end_date IS NULL` before the first data seeding in Epic 4.
 
+## Deferred from: code review of 4-2-safe-harbour-boilerplate-filter-and-extraction-confidence-scoring (2026-06-06)
+
+- `insert_claim_batch` rolls back entire batch on single claim failure — any DB constraint violation (e.g., duplicate re-run) causes `asyncpg` transaction rollback, silently losing all claims for that transcript; no per-claim retry or partial-success path [`ml-sidecar/src/db/queries.py`]
+- DB check constraint `extraction_confidence_range` (0 ≤ x ≤ 1) existence not confirmed in this diff — dev notes assert the column and constraint already exist from story 4.1 migration; verify against `api/src/db/schema.ts` before production load testing [`api/src/db/schema.ts`]
+
 ## Deferred from: code review of 3-4-temporal-alignment-engine (2026-05-27)
 
 - `acc_no.replace("-", "")` has no accession number format validation [temporal_aligner.py] — pre-existing pattern in financials_service.py; EDGAR is reliable source; scope creep for 3.4
