@@ -50,8 +50,40 @@ async def insert_claim(
         target_value,
         extraction_confidence,
         speaker,
+        # TODO story 4.x: add claim_type, target_unit, timeframe columns to claims table
     )
     return row_id
+
+
+async def insert_claim_batch(claims: list[dict]) -> list[str]:
+    """Insert multiple claim rows in a single transaction; return their UUIDs."""
+    if not claims:
+        return []
+    pool = await get_pool()
+    row_ids: list[str] = []
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            for claim in claims:
+                row_id = str(uuid.uuid4())
+                await conn.execute(
+                    """
+                    INSERT INTO claims
+                        (id, company_id, quarter, raw_quote, metric, target_value,
+                         extraction_confidence, speaker)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    """,
+                    row_id,
+                    claim["company_id"],
+                    claim["quarter"],
+                    claim["raw_quote"],
+                    claim["metric"],
+                    claim["target_value"],
+                    claim["extraction_confidence"],
+                    claim.get("speaker"),
+                    # TODO story 4.x: add claim_type, target_unit, timeframe columns to claims table
+                )
+                row_ids.append(row_id)
+    return row_ids
 
 
 # ---------------------------------------------------------------------------
@@ -146,6 +178,31 @@ async def insert_reasoning_trace(
 # ---------------------------------------------------------------------------
 # transcripts (cache)
 # ---------------------------------------------------------------------------
+
+
+async def get_company_id_by_ticker(ticker: str) -> str | None:
+    """Return the UUID of the company row for the given ticker, or None if not found."""
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "SELECT id FROM companies WHERE ticker = $1",
+        ticker,
+    )
+    return str(row["id"]) if row else None
+
+
+async def get_all_transcripts_for_ticker(ticker: str) -> list[asyncpg.Record]:
+    """Return all transcripts for a ticker with parse_status SUCCESS or PRESS_RELEASE."""
+    pool = await get_pool()
+    return await pool.fetch(
+        """
+        SELECT ticker, quarter, filing_date, raw_text, filing_url, parse_status
+        FROM transcripts
+        WHERE ticker = $1
+          AND parse_status IN ('SUCCESS', 'PRESS_RELEASE')
+        ORDER BY quarter
+        """,
+        ticker,
+    )
 
 
 async def get_cached_transcript(ticker: str, quarter: str) -> asyncpg.Record | None:
