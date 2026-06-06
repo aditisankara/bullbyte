@@ -333,3 +333,38 @@ async def insert_tool_call_log(
         json.dumps(output) if output is not None else None,
     )
     return row_id
+
+
+# ---------------------------------------------------------------------------
+# executives
+# ---------------------------------------------------------------------------
+
+
+async def get_executive_at_date(
+    ticker: str,
+    role: str,
+    date: str,  # 'YYYY-MM-DD'
+) -> asyncpg.Record | None:
+    """Return the executive holding `role` at `ticker`'s company on `date`, or None.
+
+    Looks up company_id from the companies table, then queries executives
+    where start_date <= date AND (end_date IS NULL OR end_date >= date).
+    Returns None if the ticker has no matching company row or no executive row.
+    """
+    pool = await get_pool()
+    return await pool.fetchrow(
+        """
+        SELECT e.id, e.person_name, e.role, e.start_date, e.end_date
+        FROM executives e
+        JOIN companies c ON c.id = e.company_id
+        WHERE c.ticker = $1
+          AND e.role = $2
+          AND e.start_date <= $3
+          AND (e.end_date IS NULL OR e.end_date >= $3)
+        ORDER BY e.start_date DESC
+        LIMIT 1
+        """,
+        ticker,
+        role,
+        date,
+    )

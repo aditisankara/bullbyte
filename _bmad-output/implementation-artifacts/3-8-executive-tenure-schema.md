@@ -1,6 +1,6 @@
 # Story 3.8: Executive Tenure Schema
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -43,10 +43,10 @@ So that Epic 4's CEO delivery score (story 4.6) can roll up per-quarter verdicts
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add `executives` table to `api/src/db/schema.ts` (AC: 1, 2, 5)
-  - [ ] Add after the `financialActuals` table definition (bottom of file, before closing)
-  - [ ] Import no new Drizzle functions — `uuid`, `text`, `timestamp`, `index`, `pgTable` are already imported
-  - [ ] Table definition (exact shape):
+- [x] Task 1: Add `executives` table to `api/src/db/schema.ts` (AC: 1, 2, 5)
+  - [x] Add after the `financialActuals` table definition (bottom of file, before closing)
+  - [x] Import no new Drizzle functions — `uuid`, `text`, `timestamp`, `index`, `pgTable` are already imported
+  - [x] Table definition (exact shape):
     ```typescript
     export const executives = pgTable(
       'executives',
@@ -72,17 +72,17 @@ So that Epic 4's CEO delivery score (story 4.6) can roll up per-quarter verdicts
     export type Executive = typeof executives.$inferSelect;
     export type NewExecutive = typeof executives.$inferInsert;
     ```
-  - [ ] Verify no existing table uses the name `executives` — it does not
+  - [x] Verify no existing table uses the name `executives` — it does not
 
-- [ ] Task 2: Generate and commit the Drizzle migration (AC: 2, 4)
-  - [ ] From the `api/` directory, run: `npx drizzle-kit generate`
-  - [ ] Confirm a new file is created in `api/src/db/migrations/` (will be named `0002_*.sql`)
-  - [ ] Inspect the SQL: it must contain `CREATE TABLE "executives"` with all 7 columns and the FK constraint
-  - [ ] Commit the generated file as-is — do NOT edit manually
+- [x] Task 2: Generate and commit the Drizzle migration (AC: 2, 4)
+  - [x] From the `api/` directory, run: `npx drizzle-kit generate`
+  - [x] Confirm a new file is created in `api/src/db/migrations/` (will be named `0002_*.sql`)
+  - [x] Inspect the SQL: it must contain `CREATE TABLE "executives"` with all 7 columns and the FK constraint
+  - [x] Commit the generated file as-is — do NOT edit manually
 
-- [ ] Task 3: Add `get_executive_at_date` query helper in `ml-sidecar/src/db/queries.py` (AC: 3)
-  - [ ] Add a new section `# executives` at the bottom of the file (after `tool_call_logs`)
-  - [ ] Implement the helper:
+- [x] Task 3: Add `get_executive_at_date` query helper in `ml-sidecar/src/db/queries.py` (AC: 3)
+  - [x] Add a new section `# executives` at the bottom of the file (after `tool_call_logs`)
+  - [x] Implement the helper:
     ```python
     async def get_executive_at_date(
         ticker: str,
@@ -113,12 +113,12 @@ So that Epic 4's CEO delivery score (story 4.6) can roll up per-quarter verdicts
             date,
         )
     ```
-  - [ ] `ORDER BY e.start_date DESC LIMIT 1` handles edge case where two rows overlap (most recent wins)
+  - [x] `ORDER BY e.start_date DESC LIMIT 1` handles edge case where two rows overlap (most recent wins)
 
-- [ ] Task 4: Write tests in `ml-sidecar/tests/test_executive_queries.py` (AC: 6)
-  - [ ] Create new file; follow the pool-mock pattern from `test_caching.py`
-  - [ ] Use `unittest.mock.AsyncMock` to mock `get_pool` — same as other query tests
-  - [ ] Test 1: `test_get_executive_at_date_found`
+- [x] Task 4: Write tests in `ml-sidecar/tests/test_executive_queries.py` (AC: 6)
+  - [x] Create new file; follow the pool-mock pattern from `test_caching.py`
+  - [x] Use `unittest.mock.AsyncMock` to mock `get_pool` — same as other query tests
+  - [x] Test 1: `test_get_executive_at_date_found`
     ```python
     async def test_get_executive_at_date_found():
         mock_record = {"id": "...", "person_name": "Tim Cook", "role": "CEO",
@@ -128,8 +128,13 @@ So that Epic 4's CEO delivery score (story 4.6) can roll up per-quarter verdicts
             result = await get_executive_at_date("AAPL", "CEO", "2024-10-01")
         assert result["person_name"] == "Tim Cook"
     ```
-  - [ ] Test 2: `test_get_executive_at_date_not_found` — `fetchrow` returns `None`, assert result is `None`
-  - [ ] Test 3: `test_get_executive_at_date_query_passes_correct_params` — assert `fetchrow` called with ticker, role, and date as positional args in correct order
+  - [x] Test 2: `test_get_executive_at_date_not_found` — `fetchrow` returns `None`, assert result is `None`
+  - [x] Test 3: `test_get_executive_at_date_query_passes_correct_params` — assert `fetchrow` called with ticker, role, and date as positional args in correct order
+
+### Review Findings
+
+- [x] [Review][Patch] Missing `test_get_executive_at_date_end_date_exclusive` test [ml-sidecar/tests/test_executive_queries.py] — AC6 explicitly names this test as required. The implementation substituted `test_get_executive_at_date_query_passes_correct_params` instead. Add a test that passes a date strictly after `end_date` and asserts `None` is returned.
+- [x] [Review][Defer] No partial unique index on `(company_id, role) WHERE end_date IS NULL` [api/src/db/schema.ts / migration] — deferred, pre-existing design gap; nothing prevents two active "CEO" rows for the same company; `ORDER BY start_date DESC LIMIT 1` silently picks one. Acceptable for schema-only story; revisit before first data seeding in Epic 4.
 
 ## Dev Notes
 
@@ -220,9 +225,21 @@ The critical tenure dates to get right are the last 8 quarters (2022–2024) sin
 ### Agent Model Used
 
 claude-sonnet-4-6 (story creation via bmad-create-story, 2026-05-29)
+claude-sonnet-4-6 (implementation via bmad-dev-story, 2026-05-31)
 
 ### Debug Log References
 
 ### Completion Notes List
 
+- Added `executives` table to `api/src/db/schema.ts` after `financialActuals`; no new imports needed
+- Generated migration `api/src/db/migrations/0002_yielding_phil_sheldon.sql` via `npx drizzle-kit generate`; SQL verified: 7 columns, FK with ON DELETE cascade, 2 indexes
+- Added `get_executive_at_date(ticker, role, date)` to `ml-sidecar/src/db/queries.py` under new `# executives` section; joins via ticker, ORDER BY start_date DESC LIMIT 1
+- Created `ml-sidecar/tests/test_executive_queries.py` with 3 tests; patched `get_pool` with `return_value` per async coroutine pattern
+- 136/136 tests pass, 0 regressions
+
 ### File List
+
+- Modified: `api/src/db/schema.ts`
+- Generated (committed as-is): `api/src/db/migrations/0002_yielding_phil_sheldon.sql`
+- Modified: `ml-sidecar/src/db/queries.py`
+- Created: `ml-sidecar/tests/test_executive_queries.py`
