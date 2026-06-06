@@ -13,6 +13,7 @@ from src.core.llm.base import LLMResponse, get_provider
 from src.core.logging import get_logger
 from src.models.claim_models import (
     ClaimType,
+    BoilerplateSegment,
     ExtractionError,
     ExtractionResult,
     ExtractedClaim,
@@ -40,12 +41,18 @@ You are a financial analyst extracting forward-looking numerical claims from ear
 A forward-looking numerical claim is a statement about a FUTURE metric with a SPECIFIC NUMBER.
 Examples: revenue targets, EPS guidance, margin forecasts, unit growth goals, capex plans.
 
-DO NOT extract:
+DO NOT include in claims:
 - Historical reported figures (e.g., "Q2 revenue was $117 billion")
 - Vague directional statements without numbers (e.g., "we expect growth")
-- Safe-harbour boilerplate disclaimers (e.g., "these statements involve risks and uncertainties")
+- Safe-harbour boilerplate disclaimers — put those in the "boilerplate" array instead
 
-For each forward-looking numerical claim found, output a JSON object with these exact fields:
+Output ONLY a JSON object with exactly two keys:
+{
+  "claims": [ ...array of claim objects... ],
+  "boilerplate": [ ...array of skipped boilerplate passages... ]
+}
+
+Each claim object:
 {
   "raw_quote": "<verbatim sentence(s) from the transcript>",
   "claim_type": "<one of: revenue, earnings, margin, guidance, growth, other>",
@@ -54,11 +61,22 @@ For each forward-looking numerical claim found, output a JSON object with these 
   "target_unit": "<unit or null, e.g. 'billion USD', 'percent', 'million units'>",
   "timeframe": "<predicted period, e.g. 'Q3 2024', 'FY2025', 'next fiscal year'>",
   "speaker": "<speaker name and title from transcript labels, or null if unclear>",
-  "quarter": "<current quarter being reported, e.g. 'Q2-2024' format>"
+  "quarter": "<current quarter being reported, e.g. 'Q2-2024' format>",
+  "extraction_confidence": <float 0.0–1.0>
 }
 
-Output ONLY a JSON array of these objects. If there are no forward-looking numerical claims, output an empty array [].
-Do not include any explanation or markdown — only the raw JSON array.
+Confidence scoring rules:
+- 0.80–1.00: Explicitly stated specific number, no hedging language ("We expect", "We guide to", "We will deliver")
+- 0.60–0.79: Moderately certain ("We anticipate", "approximately X", clear context)
+- 0.00–0.59: Hedged or uncertain ("could be", "we think", "somewhere around", conditional language)
+
+Each boilerplate entry:
+{
+  "raw_segment": "<the boilerplate text>",
+  "reason": "safe_harbour_boilerplate"
+}
+
+Do not output markdown, explanations, or anything outside the JSON object.
 """
 
 
@@ -68,15 +86,19 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
 
 
 def _parse_llm_response(
-    response: LLMResponse, quarter: str
-) -> tuple[list[ExtractedClaim], list[ExtractionError]]:
-    """Parse the LLM JSON response into claims and errors."""
+    response: LLMResponse,
+    quarter: str,
+    ticker: str,
+    job_id: str,
+) -> tuple[list[ExtractedClaim], list[ExtractionError], list[BoilerplateSegment]]:
+    """Parse the LLM JSON response into claims, errors, and boilerplate segments."""
     claims: list[ExtractedClaim] = []
     errors: list[ExtractionError] = []
+    boilerplate: list[BoilerplateSegment] = []
 
     if not response.content:
         errors.append(ExtractionError(raw_segment="", error_reason="LLM returned empty response"))
-        return claims, errors
+        return claims, errors, boilerplate
 
     # Strip markdown code fences if present (handles ```json\n...\n``` and ```...\n``` and ```...```)
     text = response.content.strip()
@@ -86,23 +108,42 @@ def _parse_llm_response(
         text = re.sub(r"\n?```\s*$", "", text).strip()
 
     try:
-        raw_list = json.loads(text)
+        raw_data = json.loads(text)
     except json.JSONDecodeError as exc:
         errors.append(
             ExtractionError(raw_segment=text[:500], error_reason=f"JSON parse failed: {exc}")
         )
-        return claims, errors
+        return claims, errors, boilerplate
 
-    if not isinstance(raw_list, list):
+    if not isinstance(raw_data, dict):
         errors.append(
             ExtractionError(
                 raw_segment=text[:500],
-                error_reason="LLM response was not a JSON array",
+                error_reason="LLM response was not a JSON object",
             )
         )
-        return claims, errors
+        return claims, errors, boilerplate
 
-    for item in raw_list:
+    claim_list = raw_data.get("claims", [])
+    boilerplate_raw = raw_data.get("boilerplate", [])
+
+    if not isinstance(claim_list, list):
+        errors.append(
+            ExtractionError(
+                raw_segment=text[:500],
+                error_reason="LLM response 'claims' field is not an array",
+            )
+        )
+        return claims, errors, boilerplate
+
+    if not isinstance(boilerplate_raw, list):
+        logger.debug(
+            "LLM response 'boilerplate' field is not an array — treating as empty",
+            extra={"ticker": ticker, "quarter": quarter, "jobId": job_id},
+        )
+        boilerplate_raw = []
+
+    for item in claim_list:
         if not isinstance(item, dict):
             errors.append(
                 ExtractionError(
@@ -111,8 +152,9 @@ def _parse_llm_response(
                 )
             )
             continue
-        # Use provided quarter if the LLM omitted it
-        if "quarter" not in item or not item["quarter"]:
+        # Use provided quarter if LLM omitted it or returned a malformatted value
+        q = item.get("quarter", "")
+        if not q or not re.match(r"^Q[1-4]-\d{4}$", str(q)):
             item = {**item, "quarter": quarter}
         try:
             claims.append(ExtractedClaim(**item))
@@ -124,7 +166,33 @@ def _parse_llm_response(
                 )
             )
 
-    return claims, errors
+    for item in boilerplate_raw:
+        if not isinstance(item, dict):
+            logger.debug(
+                "Skipping non-dict boilerplate entry",
+                extra={"entry": str(item)[:100], "ticker": ticker, "quarter": quarter, "jobId": job_id},
+            )
+            continue
+        try:
+            seg = BoilerplateSegment(**item)
+            boilerplate.append(seg)
+            logger.warning(
+                "Safe-harbour boilerplate filtered",
+                extra={
+                    "raw_segment": seg.raw_segment[:300],
+                    "reason": seg.reason,
+                    "ticker": ticker,
+                    "quarter": quarter,
+                    "jobId": job_id,
+                },
+            )
+        except Exception as exc:
+            logger.debug(
+                "Skipping malformed boilerplate entry",
+                extra={"entry": str(item)[:100], "error": str(exc), "ticker": ticker, "quarter": quarter, "jobId": job_id},
+            )
+
+    return claims, errors, boilerplate
 
 
 async def extract_claims(
@@ -161,11 +229,12 @@ async def extract_claims(
         },
     )
 
-    claims, errors = _parse_llm_response(response, quarter)
+    claims, errors, boilerplate = _parse_llm_response(response, quarter, ticker, job_id)
 
     return ExtractionResult(
         claims=claims,
         errors=errors,
+        boilerplate_segments=boilerplate,
         ticker=ticker,
         quarter=quarter,
     )
