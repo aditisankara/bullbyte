@@ -35,7 +35,7 @@ describe('AnalysisProcessor', () => {
 		await processor.process(job);
 
 		expect(jobsService.markRunning).toHaveBeenCalledWith('job-1');
-		expect(mlSidecar.analyze).toHaveBeenCalledWith('TSLA');
+		expect(mlSidecar.analyze).toHaveBeenCalledWith('TSLA', 'job-1');
 		// COMPLETED is owned by the 5.3 webhook, never set here.
 		expect(jobsService.markFailed).not.toHaveBeenCalled();
 	});
