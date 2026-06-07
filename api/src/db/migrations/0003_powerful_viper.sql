@@ -1,0 +1,1 @@
+ALTER TABLE "claims" ADD COLUMN "target_unit" text;

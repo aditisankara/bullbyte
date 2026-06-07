@@ -134,6 +134,7 @@ async def _do_extraction(ticker: str, job_id: str) -> None:
                     "raw_quote": claim.raw_quote,
                     "metric": claim.metric,
                     "target_value": claim.target_value,
+                    "target_unit": claim.target_unit,
                     "extraction_confidence": Decimal(str(claim.extraction_confidence)),
                     "speaker": claim.speaker,
                 }
