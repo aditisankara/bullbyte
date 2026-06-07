@@ -27,7 +27,7 @@ export class AnalysisProcessor extends WorkerHost {
 			// Kicks off the sidecar run (it returns 202 quickly). The long-running
 			// analysis reports progress + completion via the webhook in story 5.3 —
 			// so we deliberately do NOT mark COMPLETED here. Job stays RUNNING.
-			await firstValueFrom(this.mlSidecar.analyze(ticker));
+			await firstValueFrom(this.mlSidecar.analyze(ticker, jobId));
 		} catch (err) {
 			await this.jobsService.markFailed(jobId); // AC4
 			this.logger.error('Analysis job failed', {
