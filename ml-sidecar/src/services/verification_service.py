@@ -73,7 +73,7 @@ def _build_verification_prompt(
     metrics_lines = "\n".join(
         f"  - {m.metric_name}: {m.value} {m.unit} (source: {m.section_reference}, status: {m.parse_status})"
         for m in metrics
-        if m.parse_status in ("SUCCESS", "PARTIAL")
+        if m.parse_status not in ("PARSE_FAILURE", "FETCH_ERROR")
     ) or "  (no metrics available)"
     return (
         f"Claim from earnings call:\n"
@@ -289,11 +289,11 @@ async def verify_claim(
         return await _insufficient_data(
             claim_id=claim_id,
             reason=f"Alignment failed: {decision.mapping_rationale}",
-            actuals_quarter=decision.actuals_quarter,
+            actuals_quarter=decision.actuals_quarter or claim_quarter,
             traces=_traces,
         )
 
-    actuals_quarter = decision.actuals_quarter
+    actuals_quarter = decision.actuals_quarter or claim_quarter
 
     # ── Step 2: Fetch financial actuals ──────────────────────────────────────
     financials = await ingest_financial_actuals(ticker, actuals_quarter)
@@ -333,6 +333,25 @@ async def verify_claim(
             traces=_traces,
         )
 
+    # Short-circuit when no usable metrics exist (e.g. PARTIAL filing with all metrics unparseable)
+    usable_metrics = [m for m in financials.metrics if m.parse_status not in ("PARSE_FAILURE", "FETCH_ERROR")]
+    if not usable_metrics:
+        logger.warning(
+            "No usable metrics available — producing INSUFFICIENT_DATA",
+            extra={
+                "ticker": ticker,
+                "actuals_quarter": actuals_quarter,
+                "filing_status": financials.status,
+                "jobId": job_id,
+            },
+        )
+        return await _insufficient_data(
+            claim_id=claim_id,
+            reason=f"No usable metrics in {financials.status} filing for {actuals_quarter}",
+            actuals_quarter=actuals_quarter,
+            traces=_traces,
+        )
+
     # ── Step 3: LLM verdict ──────────────────────────────────────────────────
     user_message = _build_verification_prompt(
         claim_metric=claim_metric,
@@ -351,7 +370,19 @@ async def verify_claim(
         {"role": "user", "content": user_message},
     ]
 
-    response: LLMResponse = await provider.complete(messages=messages)
+    try:
+        response: LLMResponse = await provider.complete(messages=messages)
+    except Exception as exc:
+        logger.warning(
+            "LLM call failed — producing INSUFFICIENT_DATA",
+            extra={"ticker": ticker, "actuals_quarter": actuals_quarter, "jobId": job_id, "error": str(exc)},
+        )
+        return await _insufficient_data(
+            claim_id=claim_id,
+            reason=f"LLM call failed: {exc}",
+            actuals_quarter=actuals_quarter,
+            traces=_traces,
+        )
 
     # NFR18: emit cost log after every LLM call
     logger.info(
@@ -512,7 +543,7 @@ async def verify_claim(
         verdict_type=verdict_type,
         actual_value=actual_value,
         actuals_quarter=actuals_quarter,
-        mapping_rationale=decision.mapping_rationale,
+        mapping_rationale=_reasoning or decision.mapping_rationale,
         delta=delta,
         confidence_score=float(confidence_score),
     )

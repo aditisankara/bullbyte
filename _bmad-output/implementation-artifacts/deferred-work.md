@@ -1,5 +1,12 @@
 # Deferred Work
 
+## Deferred from: code review of 4-3-claim-verification-agent-verdict-engine (2026-06-07)
+
+- `zip(claim_ids, result.claims)` silently truncates with no assertion — not triggered by current code but a future deduplication step could silently skip tail claims [`ml-sidecar/src/routers/analysis_router.py`]
+- `messages` array passes `{"role": "system", ...}` inside messages list — Anthropic API requires system prompt as top-level param; correctness depends on `provider.complete()` implementation [`ml-sidecar/src/services/verification_service.py`]
+- `get_provider()` called inside per-claim loop — can raise `ValueError` on env misconfiguration; should be resolved once before the loop [`ml-sidecar/src/services/verification_service.py`]
+- `AMBIGUOUS` alignment status would bypass the `filing_url`-based guard if returned with a non-empty URL — not currently produced by the aligner; guard should check `decision.status != "ALIGNED"` explicitly [`ml-sidecar/src/services/verification_service.py`]
+
 ## Deferred from: code review of 4-1-llm-based-numerical-claim-extraction-agent (2026-05-31)
 
 - Unbounded transcript `raw_text` size sent to LLM without token/character guard [`ml-sidecar/src/routers/analysis_router.py`] — transcript size is bounded by EDGAR/press-release ingestion; a hard cap + warning belongs in a later performance/reliability story

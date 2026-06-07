@@ -189,19 +189,21 @@ async def test_insufficient_data_on_alignment_fetch_error():
 async def test_insufficient_data_on_filing_not_yet_available():
     from src.services.verification_service import verify_claim
 
-    with _patch_all(
-        financials=_make_financials(status="FILING_NOT_YET_AVAILABLE", metrics=[]),
+    mock_prov = MagicMock()
+    mock_prov.complete = AsyncMock()
+
+    with (
+        patch("src.services.verification_service.align_call_to_actuals",
+              new=AsyncMock(return_value=_make_alignment())),
+        patch("src.services.verification_service.ingest_financial_actuals",
+              new=AsyncMock(return_value=_make_financials(status="FILING_NOT_YET_AVAILABLE", metrics=[]))),
+        patch("src.core.llm.base._provider", mock_prov),
+        patch("src.services.verification_service.insert_verdict",
+              new=AsyncMock(return_value="verdict-id-nf")),
+        patch("src.services.verification_service.insert_reasoning_trace",
+              new=AsyncMock(return_value="trace-id-nf")),
     ):
-        with patch("src.core.llm.base._provider") as mock_prov:
-            with patch("src.services.verification_service.ingest_financial_actuals",
-                       new=AsyncMock(return_value=_make_financials(status="FILING_NOT_YET_AVAILABLE", metrics=[]))):
-                with patch("src.services.verification_service.align_call_to_actuals",
-                           new=AsyncMock(return_value=_make_alignment())):
-                    with patch("src.services.verification_service.insert_verdict",
-                               new=AsyncMock(return_value="verdict-id-nf")):
-                        with patch("src.services.verification_service.insert_reasoning_trace",
-                                   new=AsyncMock(return_value="trace-id-nf")):
-                            result = await verify_claim(**CLAIM_KWARGS)
+        result = await verify_claim(**CLAIM_KWARGS)
 
     assert result.verdict_type == "INSUFFICIENT_DATA"
     mock_prov.complete.assert_not_called()
