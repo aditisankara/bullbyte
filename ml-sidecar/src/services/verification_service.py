@@ -193,17 +193,33 @@ def _compute_confidence(
         return Decimal("0.60") if best_metric_status == "SUCCESS" else Decimal("0.45")
 
 
+def _make_filing_ref(filing_type: str, ticker: str, quarter: str, url: str) -> str | None:
+    if not url:
+        return None
+    return f"{filing_type} | {ticker} | {quarter} | {url}"
+
+
 async def _insufficient_data(
     claim_id: str,
     reason: str,
     actuals_quarter: str,
     confidence_score: Decimal = Decimal("0.20"),
+    traces: list[dict] | None = None,
 ) -> VerificationResult:
     verdict_id = await insert_verdict(
         claim_id=claim_id,
         verdict_type="INSUFFICIENT_DATA",
         confidence_score=confidence_score,
     )
+    if traces:
+        for step_index, trace in enumerate(traces, 1):
+            await insert_reasoning_trace(
+                verdict_id=verdict_id,
+                step_index=step_index,
+                tool_call=trace.get("tool_call"),
+                result_summary=trace.get("result_summary"),
+                edgar_filing_ref=trace.get("edgar_filing_ref"),
+            )
     return VerificationResult(
         claim_id=claim_id,
         verdict_id=verdict_id,
@@ -234,8 +250,28 @@ async def verify_claim(
     which in turn use edgar_client.get_client() (rate-limited).
     LLM accessed only via get_provider() (NFR17).
     """
+    _traces: list[dict] = []
+
     # ── Step 1: Temporal alignment ────────────────────────────────────────────
     decision = await align_call_to_actuals(ticker, claim_quarter)
+    _traces.append({
+        "tool_call": {
+            "action": "temporal_alignment",
+            "ticker": ticker,
+            "claim_quarter": claim_quarter,
+            "actuals_quarter": decision.actuals_quarter,
+            "filing_type": decision.filing_type,
+            "status": decision.status,
+            "alignment_confidence": decision.alignment_confidence,
+        },
+        "result_summary": (
+            f"Aligned {claim_quarter} → {decision.actuals_quarter} "
+            f"({decision.status}, {decision.alignment_confidence}): {decision.mapping_rationale}"
+        ),
+        "edgar_filing_ref": _make_filing_ref(
+            decision.filing_type, ticker, decision.actuals_quarter, decision.filing_url
+        ),
+    })
 
     if decision.status == "FETCH_ERROR" or not decision.filing_url:
         logger.warning(
@@ -254,12 +290,30 @@ async def verify_claim(
             claim_id=claim_id,
             reason=f"Alignment failed: {decision.mapping_rationale}",
             actuals_quarter=decision.actuals_quarter,
+            traces=_traces,
         )
 
     actuals_quarter = decision.actuals_quarter
 
     # ── Step 2: Fetch financial actuals ──────────────────────────────────────
     financials = await ingest_financial_actuals(ticker, actuals_quarter)
+    _traces.append({
+        "tool_call": {
+            "action": "fetch_financial_actuals",
+            "ticker": ticker,
+            "actuals_quarter": actuals_quarter,
+            "filing_type": financials.filing_type,
+            "status": financials.status,
+            "metrics_count": len(financials.metrics),
+        },
+        "result_summary": (
+            f"Fetched {financials.filing_type} for {actuals_quarter}: "
+            f"status={financials.status}, {len(financials.metrics)} metrics available"
+        ),
+        "edgar_filing_ref": _make_filing_ref(
+            financials.filing_type, ticker, actuals_quarter, financials.filing_url
+        ),
+    })
 
     if financials.status in ("FETCH_ERROR", "FILING_NOT_YET_AVAILABLE"):
         logger.warning(
@@ -276,6 +330,7 @@ async def verify_claim(
             claim_id=claim_id,
             reason=f"Financials unavailable: {financials.status}",
             actuals_quarter=actuals_quarter,
+            traces=_traces,
         )
 
     # ── Step 3: LLM verdict ──────────────────────────────────────────────────
@@ -322,6 +377,23 @@ async def verify_claim(
         )
         verdict_type = "INSUFFICIENT_DATA"
 
+    _traces.append({
+        "tool_call": {
+            "action": "llm_verdict",
+            "claim_metric": claim_metric,
+            "target_value": target_value,
+            "target_unit": target_unit,
+            "model": response.model,
+            "verdict": verdict_type,
+            "matched_metric": matched_metric_name,
+        },
+        "result_summary": (
+            f"LLM verdict: {verdict_type} "
+            f"(matched: {matched_metric_name or 'none'}). {_reasoning}"
+        ),
+        "edgar_filing_ref": None,
+    })
+
     # ── Step 4: Find actual metric value ─────────────────────────────────────
     actual_value: str | None = None
     actual_unit: str | None = None
@@ -348,7 +420,6 @@ async def verify_claim(
 
     # ── Step 5: Compute delta ─────────────────────────────────────────────────
     delta: str | None = None
-    normalization_needed = False
 
     if verdict_type != "INSUFFICIENT_DATA":
         delta, is_unit_conflict = _compute_delta(
@@ -365,19 +436,52 @@ async def verify_claim(
                     "jobId": job_id,
                 },
             )
+            _traces.append({
+                "tool_call": {
+                    "action": "unit_conflict",
+                    "claim_metric": claim_metric,
+                    "target_unit": target_unit,
+                    "actual_unit": actual_unit,
+                    "reason": f"Cannot normalize {target_unit!r} to {actual_unit!r}",
+                },
+                "result_summary": (
+                    f"Unit conflict: target in {target_unit!r} is incompatible with "
+                    f"actual in {actual_unit!r} — upgrading to INSUFFICIENT_DATA"
+                ),
+                "edgar_filing_ref": None,
+            })
             return await _insufficient_data(
                 claim_id=claim_id,
                 reason=f"Unit conflict: cannot normalize {target_unit!r} to {actual_unit!r}",
                 actuals_quarter=actuals_quarter,
+                traces=_traces,
             )
-        # Flag if units differed so we log a normalization trace step after insert
-        if (
-            delta is not None
-            and target_unit
-            and actual_unit
-            and target_unit.lower() != actual_unit.lower()
-        ):
-            normalization_needed = True
+
+    # ── Step 5 (continued): Append normalization trace if units differed ──────
+    if (
+        delta is not None
+        and target_unit
+        and actual_unit
+        and target_unit.lower() != actual_unit.lower()
+    ):
+        _traces.append({
+            "tool_call": {
+                "action": "unit_normalization",
+                "claim_metric": claim_metric,
+                "target_value": target_value,
+                "target_unit": target_unit,
+                "actual_value": actual_value,
+                "actual_unit": actual_unit,
+                "delta": delta,
+            },
+            "result_summary": (
+                f"Normalized units before delta: "
+                f"target={target_value} ({target_unit}), "
+                f"actual={actual_value} ({actual_unit}), "
+                f"delta={delta}"
+            ),
+            "edgar_filing_ref": None,
+        })
 
     # ── Step 6: Compute confidence score ─────────────────────────────────────
     confidence_score = _compute_confidence(
@@ -392,27 +496,14 @@ async def verify_claim(
         confidence_score=confidence_score,
     )
 
-    # ── Step 8: Log normalization trace when units were converted ─────────────
-    if normalization_needed:
+    # ── Step 8: Write all accumulated reasoning traces ────────────────────────
+    for step_index, trace in enumerate(_traces, 1):
         await insert_reasoning_trace(
             verdict_id=verdict_id,
-            step_index=1,
-            tool_call={
-                "action": "unit_normalization",
-                "claim_metric": claim_metric,
-                "target_value": target_value,
-                "target_unit": target_unit,
-                "actual_value": actual_value,
-                "actual_unit": actual_unit,
-                "delta": delta,
-            },
-            result_summary=(
-                f"Normalized units before delta: "
-                f"target={target_value} ({target_unit}), "
-                f"actual={actual_value} ({actual_unit}), "
-                f"delta={delta}"
-            ),
-            edgar_filing_ref=None,
+            step_index=step_index,
+            tool_call=trace.get("tool_call"),
+            result_summary=trace.get("result_summary"),
+            edgar_filing_ref=trace.get("edgar_filing_ref"),
         )
 
     return VerificationResult(

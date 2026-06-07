@@ -163,7 +163,7 @@ async def insert_reasoning_trace(
         row_id,
         verdict_id,
         step_index,
-        json.dumps(tool_call) if tool_call is not None else None,
+        tool_call,
         result_summary,
         edgar_filing_ref,
     )

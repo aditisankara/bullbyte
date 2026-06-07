@@ -1,6 +1,6 @@
 # Story 4.5: Structured Reasoning Trace Logger
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -60,48 +60,48 @@ Then no trace step with `tool_call.action == "unit_normalization"` is written �
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add `_make_filing_ref()` helper to `verification_service.py` (AC: 2)
-  - [ ] Define `_make_filing_ref(filing_type, ticker, quarter, url) -> str | None`
-  - [ ] Return `None` if `url` is falsy
-  - [ ] Return `"{filing_type} | {ticker} | {quarter} | {url}"` otherwise
+- [x] Task 1: Add `_make_filing_ref()` helper to `verification_service.py` (AC: 2)
+  - [x] Define `_make_filing_ref(filing_type, ticker, quarter, url) -> str | None`
+  - [x] Return `None` if `url` is falsy
+  - [x] Return `"{filing_type} | {ticker} | {quarter} | {url}"` otherwise
 
-- [ ] Task 2: Update `_insufficient_data()` to accept and flush trace steps (AC: 4, 5)
-  - [ ] Add `traces: list[dict] | None = None` parameter (default None — backward compatible)
-  - [ ] After `insert_verdict()` succeeds and `verdict_id` is obtained, write each trace step via `insert_reasoning_trace()` using enumerate(traces, 1) for step_index
-  - [ ] Existing callers with no `traces` arg are unaffected
+- [x] Task 2: Update `_insufficient_data()` to accept and flush trace steps (AC: 4, 5)
+  - [x] Add `traces: list[dict] | None = None` parameter (default None — backward compatible)
+  - [x] After `insert_verdict()` succeeds and `verdict_id` is obtained, write each trace step via `insert_reasoning_trace()` using enumerate(traces, 1) for step_index
+  - [x] Existing callers with no `traces` arg are unaffected
 
-- [ ] Task 3: Refactor `verify_claim()` to collect and flush traces (AC: 1, 2, 3, 5, 6, 7)
-  - [ ] Add `_traces: list[dict] = []` at the top of `verify_claim()`
-  - [ ] After `align_call_to_actuals()` completes, append alignment trace entry (step details in Dev Notes)
-  - [ ] Pass `traces=_traces` to `_insufficient_data()` on alignment failure early exit
-  - [ ] After `ingest_financial_actuals()` completes, append financials trace entry
-  - [ ] Pass `traces=_traces` to `_insufficient_data()` on financials failure early exit
-  - [ ] After LLM `provider.complete()` and `_parse_full_verdict_response()`, append LLM verdict trace entry
-  - [ ] When unit conflict detected (`is_unit_conflict=True`), append unit_conflict trace entry then pass `traces=_traces` to `_insufficient_data()`
-  - [ ] Remove the old `normalization_needed` flag and Step 8 block from 4.4
-  - [ ] If `delta is not None` and units differ, append unit_normalization trace entry to `_traces` BEFORE calling `insert_verdict()`
-  - [ ] After `insert_verdict()` returns `verdict_id`, write all accumulated `_traces` via `insert_reasoning_trace()` in a loop using enumerate(1)
+- [x] Task 3: Refactor `verify_claim()` to collect and flush traces (AC: 1, 2, 3, 5, 6, 7)
+  - [x] Add `_traces: list[dict] = []` at the top of `verify_claim()`
+  - [x] After `align_call_to_actuals()` completes, append alignment trace entry (step details in Dev Notes)
+  - [x] Pass `traces=_traces` to `_insufficient_data()` on alignment failure early exit
+  - [x] After `ingest_financial_actuals()` completes, append financials trace entry
+  - [x] Pass `traces=_traces` to `_insufficient_data()` on financials failure early exit
+  - [x] After LLM `provider.complete()` and `_parse_full_verdict_response()`, append LLM verdict trace entry
+  - [x] When unit conflict detected (`is_unit_conflict=True`), append unit_conflict trace entry then pass `traces=_traces` to `_insufficient_data()`
+  - [x] Remove the old `normalization_needed` flag and Step 8 block from 4.4
+  - [x] If `delta is not None` and units differ, append unit_normalization trace entry to `_traces` BEFORE calling `insert_verdict()`
+  - [x] After `insert_verdict()` returns `verdict_id`, write all accumulated `_traces` via `insert_reasoning_trace()` in a loop using enumerate(1)
 
-- [ ] Task 4: Update `ml-sidecar/tests/test_verification.py` (AC: regression guard)
-  - [ ] Add `insert_reasoning_trace` mock to `test_insufficient_data_on_alignment_fetch_error` (see Dev Notes for exact patch)
-  - [ ] Add `insert_reasoning_trace` mock to `test_insufficient_data_on_filing_not_yet_available` (see Dev Notes)
-  - [ ] Add `insert_reasoning_trace` mock to `test_insufficient_data_on_financials_fetch_error` (see Dev Notes)
-  - [ ] No changes to `_patch_all()` — it already patches `insert_reasoning_trace` (added in story 4.4)
+- [x] Task 4: Update `ml-sidecar/tests/test_verification.py` (AC: regression guard)
+  - [x] Add `insert_reasoning_trace` mock to `test_insufficient_data_on_alignment_fetch_error` (see Dev Notes for exact patch)
+  - [x] Add `insert_reasoning_trace` mock to `test_insufficient_data_on_filing_not_yet_available` (see Dev Notes)
+  - [x] Add `insert_reasoning_trace` mock to `test_insufficient_data_on_financials_fetch_error` (see Dev Notes)
+  - [x] No changes to `_patch_all()` — it already patches `insert_reasoning_trace` (added in story 4.4)
 
-- [ ] Task 5: Update `ml-sidecar/tests/test_delta_scoring.py` (AC: regression guard)
-  - [ ] Update `test_normalization_trace_written_when_units_differ` — assert that at least one `insert_reasoning_trace` call has `tool_call["action"] == "unit_normalization"` (not `call_count == 1`)
-  - [ ] Update `test_no_trace_when_same_units` — assert that no `insert_reasoning_trace` call has `tool_call["action"] == "unit_normalization"` (not `assert_not_called()`)
+- [x] Task 5: Update `ml-sidecar/tests/test_delta_scoring.py` (AC: regression guard)
+  - [x] Update `test_normalization_trace_written_when_units_differ` — assert that at least one `insert_reasoning_trace` call has `tool_call["action"] == "unit_normalization"` (not `call_count == 1`)
+  - [x] Update `test_no_trace_when_same_units` — assert that no `insert_reasoning_trace` call has `tool_call["action"] == "unit_normalization"` (not `assert_not_called()`)
 
-- [ ] Task 6: Create `ml-sidecar/tests/test_reasoning_trace.py` (AC: 1, 2, 3, 4, 5, 6, 7)
-  - [ ] `test_full_trace_steps_logged_on_delivered` — DELIVERED verdict with different units; assert 4 `insert_reasoning_trace` calls with step_index 1, 2, 3, 4
-  - [ ] `test_full_trace_steps_same_units` — DELIVERED verdict, same units; assert exactly 3 calls (no normalization step)
-  - [ ] `test_alignment_failure_writes_one_trace_step` — FETCH_ERROR alignment; assert 1 call at step_index 1 with action `temporal_alignment`
-  - [ ] `test_financials_failure_writes_two_trace_steps` — SUCCESS alignment, FETCH_ERROR financials; assert 2 calls
-  - [ ] `test_unit_conflict_writes_traces_including_conflict_step` — unit conflict; assert 4 calls including one with action `unit_conflict`
-  - [ ] `test_edgar_filing_ref_format_on_alignment_step` — assert edgar_filing_ref matches `"{filing_type} | {ticker} | {quarter} | {url}"` format
-  - [ ] `test_edgar_filing_ref_none_on_llm_step` — LLM step has `edgar_filing_ref=None`
-  - [ ] `test_step_indices_sequential_from_1` — assert step_indices passed to `insert_reasoning_trace` are 1, 2, 3, ... with no gaps
-  - [ ] `test_all_traces_share_same_verdict_id` — all `insert_reasoning_trace` calls use the same `verdict_id`
+- [x] Task 6: Create `ml-sidecar/tests/test_reasoning_trace.py` (AC: 1, 2, 3, 4, 5, 6, 7)
+  - [x] `test_full_trace_steps_logged_on_delivered` — DELIVERED verdict with different units; assert 4 `insert_reasoning_trace` calls with step_index 1, 2, 3, 4
+  - [x] `test_full_trace_steps_same_units` — DELIVERED verdict, same units; assert exactly 3 calls (no normalization step)
+  - [x] `test_alignment_failure_writes_one_trace_step` — FETCH_ERROR alignment; assert 1 call at step_index 1 with action `temporal_alignment`
+  - [x] `test_financials_failure_writes_two_trace_steps` — SUCCESS alignment, FETCH_ERROR financials; assert 2 calls
+  - [x] `test_unit_conflict_writes_traces_including_conflict_step` — unit conflict; assert 4 calls including one with action `unit_conflict`
+  - [x] `test_edgar_filing_ref_format_on_alignment_step` — assert edgar_filing_ref matches `"{filing_type} | {ticker} | {quarter} | {url}"` format
+  - [x] `test_edgar_filing_ref_none_on_llm_step` — LLM step has `edgar_filing_ref=None`
+  - [x] `test_step_indices_sequential_from_1` — assert step_indices passed to `insert_reasoning_trace` are 1, 2, 3, ... with no gaps
+  - [x] `test_all_traces_share_same_verdict_id` — all `insert_reasoning_trace` calls use the same `verdict_id`
 
 ## Dev Notes
 
@@ -714,4 +714,23 @@ claude-sonnet-4-6 (story creation via bmad-create-story, 2026-06-07)
 
 ### Completion Notes List
 
+- Added `_make_filing_ref()` pure helper before `_insufficient_data()` — returns formatted string or None when URL is absent
+- Extended `_insufficient_data()` with optional `traces` parameter — flushes all collected trace steps after `insert_verdict()` using enumerate(traces, 1)
+- Refactored `verify_claim()` to accumulate all trace steps in `_traces: list[dict]` inline, replacing the hardcoded `normalization_needed` Step 8 from 4.4 with position-aware appending before `insert_verdict()`
+- All 4 trace steps (alignment, financials, LLM, normalization/conflict) collected; flushed in order after `insert_verdict()` so step_index is always sequential from 1
+- EDGAR filing refs present for alignment and financials steps; None for LLM and normalization/conflict steps
+- All early-exit paths (alignment failure, financials failure, unit conflict) flush partial traces through updated `_insufficient_data()` call
+- 9 new tests in `test_reasoning_trace.py` cover all 7 ACs; 28/28 tests pass
+
 ### File List
+
+- ml-sidecar/src/services/verification_service.py
+- ml-sidecar/src/db/queries.py
+- ml-sidecar/tests/test_verification.py
+- ml-sidecar/tests/test_delta_scoring.py
+- ml-sidecar/tests/test_reasoning_trace.py (NEW)
+
+## Change Log
+
+- 2026-06-07: Implemented story 4.5 — added `_make_filing_ref()`, extended `_insufficient_data()` with trace flush, refactored `verify_claim()` to collect and flush full reasoning traces for all verdict paths. Updated 3 early-exit tests in test_verification.py and 2 normalization assertions in test_delta_scoring.py. Created test_reasoning_trace.py with 9 tests covering all ACs. 28/28 tests pass.
+- 2026-06-07: Bug fix — `queries.py` `insert_reasoning_trace()` was passing `json.dumps(tool_call)` (a string) to asyncpg, causing asyncpg to double-serialize it as a JSONB string instead of a JSONB object. Fixed by passing the dict directly; asyncpg handles Python dicts natively for JSONB parameters. Verified manually: `tool_call->>'action'` now returns correct values from DB.

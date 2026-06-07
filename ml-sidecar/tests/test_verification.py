@@ -175,6 +175,7 @@ async def test_insufficient_data_on_alignment_fetch_error():
         patch("src.services.verification_service.ingest_financial_actuals", new=mock_financials),
         patch("src.core.llm.base._provider", mock_llm),
         patch("src.services.verification_service.insert_verdict", new=AsyncMock(return_value="verdict-id-err")),
+        patch("src.services.verification_service.insert_reasoning_trace", new=AsyncMock(return_value="trace-id-align-err")),
     ):
         result = await verify_claim(**CLAIM_KWARGS)
 
@@ -198,7 +199,9 @@ async def test_insufficient_data_on_filing_not_yet_available():
                            new=AsyncMock(return_value=_make_alignment())):
                     with patch("src.services.verification_service.insert_verdict",
                                new=AsyncMock(return_value="verdict-id-nf")):
-                        result = await verify_claim(**CLAIM_KWARGS)
+                        with patch("src.services.verification_service.insert_reasoning_trace",
+                                   new=AsyncMock(return_value="trace-id-nf")):
+                            result = await verify_claim(**CLAIM_KWARGS)
 
     assert result.verdict_type == "INSUFFICIENT_DATA"
     mock_prov.complete.assert_not_called()
@@ -215,6 +218,8 @@ async def test_insufficient_data_on_financials_fetch_error():
               new=AsyncMock(return_value=_make_financials(status="FETCH_ERROR", metrics=[]))),
         patch("src.services.verification_service.insert_verdict",
               new=AsyncMock(return_value="verdict-id-fe")),
+        patch("src.services.verification_service.insert_reasoning_trace",
+              new=AsyncMock(return_value="trace-id-fe")),
     ):
         result = await verify_claim(**CLAIM_KWARGS)
 

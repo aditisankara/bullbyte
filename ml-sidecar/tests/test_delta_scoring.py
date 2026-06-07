@@ -326,10 +326,16 @@ async def test_normalization_trace_written_when_units_differ():
         # CLAIM_KWARGS has target_unit="billion USD" — differs from "USD"
         await verify_claim(**CLAIM_KWARGS)
 
-    mock_trace.assert_called_once()
-    call_kwargs = mock_trace.call_args.kwargs
-    assert call_kwargs.get("result_summary") is not None
-    assert len(call_kwargs["result_summary"]) > 0
+    # insert_reasoning_trace is called multiple times (alignment + financials + LLM + normalization)
+    # Assert at least one normalization-specific call was made
+    norm_calls = [
+        call for call in mock_trace.call_args_list
+        if call.kwargs.get("tool_call", {}).get("action") == "unit_normalization"
+    ]
+    assert len(norm_calls) == 1, "Expected exactly one unit_normalization trace step"
+    norm_kwargs = norm_calls[0].kwargs
+    assert norm_kwargs["tool_call"]["action"] == "unit_normalization"
+    assert norm_kwargs["result_summary"] is not None
 
 
 @pytest.mark.asyncio
@@ -347,4 +353,9 @@ async def test_no_trace_when_same_units():
     ):
         await verify_claim(**kwargs)
 
-    mock_trace.assert_not_called()
+    # Traces ARE written (alignment, financials, LLM steps) — but no normalization step
+    norm_calls = [
+        call for call in mock_trace.call_args_list
+        if call.kwargs.get("tool_call", {}).get("action") == "unit_normalization"
+    ]
+    assert len(norm_calls) == 0, "No unit_normalization trace step expected when units match"
