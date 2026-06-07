@@ -31,6 +31,7 @@ async def insert_claim(
     target_value: str,
     extraction_confidence: Decimal,
     speaker: str | None = None,
+    target_unit: str | None = None,
 ) -> str:
     """Insert a claim row and return its UUID."""
     pool = await get_pool()
@@ -39,8 +40,8 @@ async def insert_claim(
         """
         INSERT INTO claims
             (id, company_id, quarter, raw_quote, metric, target_value,
-             extraction_confidence, speaker)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             extraction_confidence, speaker, target_unit)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         """,
         row_id,
         company_id,
@@ -50,7 +51,8 @@ async def insert_claim(
         target_value,
         extraction_confidence,
         speaker,
-        # TODO story 4.x: add claim_type, target_unit, timeframe columns to claims table
+        target_unit,
+        # TODO story 4.x: add claim_type, timeframe columns to claims table
     )
     return row_id
 
@@ -69,8 +71,8 @@ async def insert_claim_batch(claims: list[dict]) -> list[str]:
                     """
                     INSERT INTO claims
                         (id, company_id, quarter, raw_quote, metric, target_value,
-                         extraction_confidence, speaker)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                         extraction_confidence, speaker, target_unit)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                     """,
                     row_id,
                     claim["company_id"],
@@ -80,7 +82,8 @@ async def insert_claim_batch(claims: list[dict]) -> list[str]:
                     claim["target_value"],
                     claim["extraction_confidence"],
                     claim.get("speaker"),
-                    # TODO story 4.x: add claim_type, target_unit, timeframe columns to claims table
+                    claim.get("target_unit"),
+                    # TODO story 4.x: add claim_type, timeframe columns to claims table
                 )
                 row_ids.append(row_id)
     return row_ids
