@@ -371,3 +371,24 @@ async def get_executive_at_date(
         role,
         date,
     )
+
+
+async def get_verdicts_for_ticker(ticker: str) -> list[asyncpg.Record]:
+    """Return verdict counts grouped by verdict_type for all claims belonging to ticker.
+
+    Joins through claims → companies to scope verdicts to the given ticker.
+    Each record has: verdict_type (str), count (int).
+    Returns an empty list if ticker not found or has no verdicts.
+    """
+    pool = await get_pool()
+    return await pool.fetch(
+        """
+        SELECT v.verdict_type, COUNT(*)::int AS count
+        FROM verdicts v
+        JOIN claims c ON c.id = v.claim_id
+        JOIN companies co ON co.id = c.company_id
+        WHERE co.ticker = $1
+        GROUP BY v.verdict_type
+        """,
+        ticker,
+    )
