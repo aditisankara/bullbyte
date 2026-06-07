@@ -1,6 +1,6 @@
 # Story 4.4: Quantitative Delta Calculation & Verification Confidence Scoring
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -55,35 +55,35 @@ And `result.confidence_score` is a float between 0 and 1
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Update `ml-sidecar/src/models/verdict_models.py` (AC: 6)
-  - [ ] Add `delta: str | None = None` field to `VerificationResult`
-  - [ ] Add `confidence_score: float | None = None` field to `VerificationResult`
-  - [ ] Both fields have defaults of `None` so existing callers don't break
+- [x] Task 1: Update `ml-sidecar/src/models/verdict_models.py` (AC: 6)
+  - [x] Add `delta: str | None = None` field to `VerificationResult`
+  - [x] Add `confidence_score: float | None = None` field to `VerificationResult`
+  - [x] Both fields have defaults of `None` so existing callers don't break
 
-- [ ] Task 2: Update `ml-sidecar/src/services/verification_service.py` (AC: 1, 2, 3, 4, 5, 6)
-  - [ ] Add import: `from decimal import Decimal`
-  - [ ] Add import: `from src.db.queries import insert_reasoning_trace`
-  - [ ] Replace `_parse_verdict_response()` with `_parse_full_verdict_response()` returning `tuple[str, str | None, str]` — `(verdict_type, matched_metric_name, reasoning)`
-  - [ ] Add `_parse_numeric_value(value_str, unit_str)` helper — see Dev Notes for exact implementation
-  - [ ] Add `_compute_delta(target_value, target_unit, actual_value, actual_unit)` helper — returns `(str | None, bool)` where bool is `is_unit_conflict`
-  - [ ] Add `_compute_confidence(matched_metric, claim_metric, verdict_type, best_metric_status)` helper — returns `Decimal`
-  - [ ] Update `_insufficient_data()` helper to accept `confidence_score: Decimal` param and pass it to `insert_verdict()`; update returned `VerificationResult` to include `delta=None, confidence_score=float(confidence_score)`
-  - [ ] Update `verify_claim()` — see Dev Notes for precise diff
+- [x] Task 2: Update `ml-sidecar/src/services/verification_service.py` (AC: 1, 2, 3, 4, 5, 6)
+  - [x] Add import: `from decimal import Decimal`
+  - [x] Add import: `from src.db.queries import insert_reasoning_trace`
+  - [x] Replace `_parse_verdict_response()` with `_parse_full_verdict_response()` returning `tuple[str, str | None, str]` — `(verdict_type, matched_metric_name, reasoning)`
+  - [x] Add `_parse_numeric_value(value_str, unit_str)` helper — see Dev Notes for exact implementation
+  - [x] Add `_compute_delta(target_value, target_unit, actual_value, actual_unit)` helper — returns `(str | None, bool)` where bool is `is_unit_conflict`
+  - [x] Add `_compute_confidence(matched_metric, claim_metric, verdict_type, best_metric_status)` helper — returns `Decimal`
+  - [x] Update `_insufficient_data()` helper to accept `confidence_score: Decimal` param and pass it to `insert_verdict()`; update returned `VerificationResult` to include `delta=None, confidence_score=float(confidence_score)`
+  - [x] Update `verify_claim()` — see Dev Notes for precise diff
 
-- [ ] Task 3: Update `ml-sidecar/tests/test_verification.py` (AC: regression guard)
-  - [ ] Add `insert_reasoning_trace` to the `_patch_all()` helper — patch `"src.services.verification_service.insert_reasoning_trace"` as `AsyncMock(return_value="trace-uuid")` so existing tests don't hit the DB when normalization triggers a trace write
+- [x] Task 3: Update `ml-sidecar/tests/test_verification.py` (AC: regression guard)
+  - [x] Add `insert_reasoning_trace` to the `_patch_all()` helper — patch `"src.services.verification_service.insert_reasoning_trace"` as `AsyncMock(return_value="trace-uuid")` so existing tests don't hit the DB when normalization triggers a trace write
 
-- [ ] Task 4: Create `ml-sidecar/tests/test_delta_scoring.py` (AC: 1, 2, 3, 4, 5, 6)
-  - [ ] `test_delta_calculated_for_delivered` — same-unit claim; assert `insert_verdict` receives non-None `delta` and `confidence_score`
-  - [ ] `test_delta_null_for_insufficient_data` — INSUFFICIENT_DATA verdict; assert `insert_verdict` receives `delta=None`
-  - [ ] `test_unit_normalization_billion_to_raw` — target `"380"` `"billion USD"`, actual `"383000000000"` `"USD"`; assert delta ≈ 3e9
-  - [ ] `test_unit_conflict_produces_insufficient_data` — incompatible units (e.g. `"percent"` vs `"USD"`); assert verdict upgrades to `INSUFFICIENT_DATA`
-  - [ ] `test_confidence_high_for_clear_match` — `matched_metric` contains `claim_metric` name + `parse_status="SUCCESS"`; assert `confidence_score >= 0.80`
-  - [ ] `test_confidence_medium_for_inferred_match` — `matched_metric` is a different name; assert `0.40 <= confidence_score < 0.80`
-  - [ ] `test_confidence_low_for_insufficient_data` — INSUFFICIENT_DATA verdict; assert `confidence_score <= 0.30`
-  - [ ] `test_low_confidence_verdict_still_written` — assert `insert_verdict` called even for low-confidence result
-  - [ ] `test_normalization_trace_written_when_units_differ` — target_unit="billion USD", actual metric unit="USD"; assert `insert_reasoning_trace` called with a non-None `result_summary`
-  - [ ] `test_no_trace_when_same_units` — same units on both sides; assert `insert_reasoning_trace` NOT called
+- [x] Task 4: Create `ml-sidecar/tests/test_delta_scoring.py` (AC: 1, 2, 3, 4, 5, 6)
+  - [x] `test_delta_calculated_for_delivered` — same-unit claim; assert `insert_verdict` receives non-None `delta` and `confidence_score`
+  - [x] `test_delta_null_for_insufficient_data` — INSUFFICIENT_DATA verdict; assert `insert_verdict` receives `delta=None`
+  - [x] `test_unit_normalization_billion_to_raw` — target `"380"` `"billion USD"`, actual `"383000000000"` `"USD"`; assert delta ≈ 3e9
+  - [x] `test_unit_conflict_produces_insufficient_data` — incompatible units (e.g. `"percent"` vs `"USD"`); assert verdict upgrades to `INSUFFICIENT_DATA`
+  - [x] `test_confidence_high_for_clear_match` — `matched_metric` contains `claim_metric` name + `parse_status="SUCCESS"`; assert `confidence_score >= 0.80`
+  - [x] `test_confidence_medium_for_inferred_match` — `matched_metric` is a different name; assert `0.40 <= confidence_score < 0.80`
+  - [x] `test_confidence_low_for_insufficient_data` — INSUFFICIENT_DATA verdict; assert `confidence_score <= 0.30`
+  - [x] `test_low_confidence_verdict_still_written` — assert `insert_verdict` called even for low-confidence result
+  - [x] `test_normalization_trace_written_when_units_differ` — target_unit="billion USD", actual metric unit="USD"; assert `insert_reasoning_trace` called with a non-None `result_summary`
+  - [x] `test_no_trace_when_same_units` — same units on both sides; assert `insert_reasoning_trace` NOT called
 
 ## Dev Notes
 
@@ -597,9 +597,29 @@ Do NOT add `timestamp` to any `extra` dict — the formatter adds it automatical
 ### Agent Model Used
 
 claude-sonnet-4-6 (story creation via bmad-create-story, 2026-06-07)
+claude-sonnet-4-6 (implementation via bmad-dev-story, 2026-06-07)
 
 ### Debug Log References
 
+- Fixed `test_unit_conflict_produces_insufficient_data` assertion: unit-conflict path calls `_insufficient_data()` which doesn't pass `delta` kwarg explicitly (relies on default None). Changed `call_kwargs["delta"]` to `call_kwargs.get("delta")`.
+- Added `insert_reasoning_trace` patch to `test_verdict_stored_screaming_snake_case` in `test_verification.py` (not noted in story but required: default CLAIM_KWARGS has `target_unit="billion USD"` vs metric `unit="USD"`, which triggers normalization trace).
+
 ### Completion Notes List
 
+- Extended `VerificationResult` with optional `delta: str | None` and `confidence_score: float | None` fields (both default None — no existing callers break).
+- Replaced `_parse_verdict_response()` with `_parse_full_verdict_response()` which also extracts `matched_metric` and `reasoning` from LLM JSON.
+- Added three pure helpers: `_parse_numeric_value` (financial scale normalization), `_compute_delta` (signed delta with unit-conflict detection), `_compute_confidence` (deterministic 0–1 score).
+- Updated `_insufficient_data()` to accept `confidence_score: Decimal` and persist it via `insert_verdict`.
+- Updated `verify_claim()` Steps 3–8: LLM parse → metric lookup → delta compute → conflict upgrade → confidence score → persist verdict with delta+confidence → optional normalization trace.
+- 19/19 tests pass; 18 pre-existing failures (lxml/yfinance missing) unchanged.
+
 ### File List
+
+- ml-sidecar/src/models/verdict_models.py
+- ml-sidecar/src/services/verification_service.py
+- ml-sidecar/tests/test_verification.py
+- ml-sidecar/tests/test_delta_scoring.py (new)
+
+### Change Log
+
+- 2026-06-07: Implemented story 4.4 — added delta calculation and confidence scoring to verification service. Extended VerificationResult model. Added 10 new tests in test_delta_scoring.py. Updated test_verification.py with insert_reasoning_trace mock.

@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import json
 import re
+from decimal import Decimal
 
 from src.core.llm.base import LLMResponse, get_provider
 from src.core.logging import get_logger
 from src.core.temporal_aligner import align_call_to_actuals
-from src.db.queries import insert_verdict
+from src.db.queries import insert_reasoning_trace, insert_verdict
 from src.models.verdict_models import VerificationResult
 from src.services.financials_service import ingest_financial_actuals
 
@@ -85,10 +86,10 @@ def _build_verification_prompt(
     )
 
 
-def _parse_verdict_response(content: str | None) -> str:
-    """Return verdict_type string or 'INSUFFICIENT_DATA' on any parse failure."""
+def _parse_full_verdict_response(content: str | None) -> tuple[str, str | None, str]:
+    """Return (verdict_type, matched_metric_name, reasoning). Never raises."""
     if not content:
-        return "INSUFFICIENT_DATA"
+        return "INSUFFICIENT_DATA", None, ""
     text = content.strip()
     if text.startswith("```"):
         text = re.sub(r"^```\w*\n?", "", text)
@@ -96,19 +97,113 @@ def _parse_verdict_response(content: str | None) -> str:
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        return "INSUFFICIENT_DATA"
+        return "INSUFFICIENT_DATA", None, ""
     verdict = data.get("verdict", "")
     if verdict not in {"DELIVERED", "MISSED", "INSUFFICIENT_DATA"}:
-        return "INSUFFICIENT_DATA"
-    return verdict
+        verdict = "INSUFFICIENT_DATA"
+    return verdict, data.get("matched_metric"), data.get("reasoning", "")
+
+
+def _parse_numeric_value(value_str: str, unit_str: str | None) -> tuple[float, str] | None:
+    """Return (normalized_float, base_unit_tag) or None if value cannot be parsed.
+
+    Normalizes common financial scale words to raw numbers:
+      "billion" / "B"  → multiply by 1e9, tag "currency"
+      "million" / "M"  → multiply by 1e6, tag "currency"
+      "trillion" / "T" → multiply by 1e12, tag "currency"
+      "%" / "percent"  → tag "percent" (no multiplier applied)
+      otherwise        → tag "raw"
+    """
+    try:
+        cleaned = value_str.strip().replace(",", "").replace("$", "").replace("%", "")
+        num = float(cleaned)
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+    unit = (unit_str or "").lower()
+    if "billion" in unit or (unit.endswith("b") and len(unit) <= 3):
+        return (num * 1_000_000_000.0, "currency")
+    if "million" in unit or (unit in {"m", "mm", "usd m", "$ m"}):
+        return (num * 1_000_000.0, "currency")
+    if "trillion" in unit or (unit.endswith("t") and len(unit) <= 3):
+        return (num * 1_000_000_000_000.0, "currency")
+    if "%" in (unit_str or "") or "percent" in unit:
+        return (num, "percent")
+    return (num, "raw")
+
+
+def _compute_delta(
+    target_value: str,
+    target_unit: str | None,
+    actual_value: str | None,
+    actual_unit: str | None,
+) -> tuple[str | None, bool]:
+    """Compute signed delta = actual - target.
+
+    Returns (delta_str, is_unit_conflict).
+    - delta_str: signed string (e.g. "3000000000.0") or None
+    - is_unit_conflict: True means caller must produce INSUFFICIENT_DATA
+    """
+    if actual_value is None:
+        return None, False  # No actual available — not a conflict
+
+    parsed_target = _parse_numeric_value(target_value, target_unit)
+    parsed_actual = _parse_numeric_value(actual_value, actual_unit)
+
+    if parsed_target is None or parsed_actual is None:
+        return None, False  # Unparseable — don't crash, just omit delta
+
+    target_num, target_tag = parsed_target
+    actual_num, actual_tag = parsed_actual
+
+    # Incompatible unit families (e.g. percent vs currency/raw)
+    meaningful = {"currency", "percent"}
+    if target_tag in meaningful and actual_tag in meaningful and target_tag != actual_tag:
+        return None, True  # Unit conflict
+
+    delta = actual_num - target_num
+    return str(delta), False
+
+
+def _compute_confidence(
+    matched_metric: str | None,
+    claim_metric: str,
+    verdict_type: str,
+    best_metric_status: str | None,
+) -> Decimal:
+    """Compute confidence score (0–1) for the verdict.
+
+    High (≥0.80):  clear metric name overlap + SUCCESS parse_status
+    Medium (0.40–0.79): inferred match or PARTIAL parse_status
+    Low (≤0.30):   INSUFFICIENT_DATA or no metric matched
+    """
+    if verdict_type == "INSUFFICIENT_DATA":
+        return Decimal("0.20")
+
+    if matched_metric is None:
+        return Decimal("0.30")
+
+    m_lower = matched_metric.lower()
+    c_lower = claim_metric.lower()
+    is_direct_match = c_lower in m_lower or m_lower in c_lower
+
+    if is_direct_match:
+        return Decimal("0.90") if best_metric_status == "SUCCESS" else Decimal("0.70")
+    else:
+        return Decimal("0.60") if best_metric_status == "SUCCESS" else Decimal("0.45")
 
 
 async def _insufficient_data(
     claim_id: str,
     reason: str,
     actuals_quarter: str,
+    confidence_score: Decimal = Decimal("0.20"),
 ) -> VerificationResult:
-    verdict_id = await insert_verdict(claim_id=claim_id, verdict_type="INSUFFICIENT_DATA")
+    verdict_id = await insert_verdict(
+        claim_id=claim_id,
+        verdict_type="INSUFFICIENT_DATA",
+        confidence_score=confidence_score,
+    )
     return VerificationResult(
         claim_id=claim_id,
         verdict_id=verdict_id,
@@ -116,6 +211,8 @@ async def _insufficient_data(
         actual_value=None,
         actuals_quarter=actuals_quarter,
         mapping_rationale=reason,
+        delta=None,
+        confidence_score=float(confidence_score),
     )
 
 
@@ -215,7 +312,8 @@ async def verify_claim(
         },
     )
 
-    verdict_type = _parse_verdict_response(response.content)
+    # ── Step 3 (continued): Parse full LLM response ───────────────────────────
+    verdict_type, matched_metric_name, _reasoning = _parse_full_verdict_response(response.content)
 
     if verdict_type not in {"DELIVERED", "MISSED", "INSUFFICIENT_DATA"}:
         logger.warning(
@@ -224,18 +322,98 @@ async def verify_claim(
         )
         verdict_type = "INSUFFICIENT_DATA"
 
-    # ── Step 4: Persist verdict ──────────────────────────────────────────────
-    verdict_id = await insert_verdict(claim_id=claim_id, verdict_type=verdict_type)
-
-    # Extract actual_value for the best-matched metric (best-effort)
+    # ── Step 4: Find actual metric value ─────────────────────────────────────
     actual_value: str | None = None
+    actual_unit: str | None = None
+    best_metric_status: str | None = None
+
     if financials.metrics:
-        matched = next(
-            (m for m in financials.metrics if claim_metric.lower() in m.metric_name.lower()),
-            None,
+        # Prefer the metric the LLM named; fall back to name-based search
+        candidates = financials.metrics
+        matched_m = None
+        if matched_metric_name:
+            matched_m = next(
+                (m for m in candidates if matched_metric_name.lower() in m.metric_name.lower()),
+                None,
+            )
+        if matched_m is None:
+            matched_m = next(
+                (m for m in candidates if claim_metric.lower() in m.metric_name.lower()),
+                None,
+            )
+        if matched_m is not None:
+            actual_value = matched_m.value
+            actual_unit = matched_m.unit
+            best_metric_status = matched_m.parse_status
+
+    # ── Step 5: Compute delta ─────────────────────────────────────────────────
+    delta: str | None = None
+    normalization_needed = False
+
+    if verdict_type != "INSUFFICIENT_DATA":
+        delta, is_unit_conflict = _compute_delta(
+            target_value, target_unit, actual_value, actual_unit
         )
-        if matched:
-            actual_value = matched.value
+        if is_unit_conflict:
+            logger.warning(
+                "Unit conflict during delta calculation — upgrading to INSUFFICIENT_DATA",
+                extra={
+                    "ticker": ticker,
+                    "claim_metric": claim_metric,
+                    "target_unit": target_unit,
+                    "actual_unit": actual_unit,
+                    "jobId": job_id,
+                },
+            )
+            return await _insufficient_data(
+                claim_id=claim_id,
+                reason=f"Unit conflict: cannot normalize {target_unit!r} to {actual_unit!r}",
+                actuals_quarter=actuals_quarter,
+            )
+        # Flag if units differed so we log a normalization trace step after insert
+        if (
+            delta is not None
+            and target_unit
+            and actual_unit
+            and target_unit.lower() != actual_unit.lower()
+        ):
+            normalization_needed = True
+
+    # ── Step 6: Compute confidence score ─────────────────────────────────────
+    confidence_score = _compute_confidence(
+        matched_metric_name, claim_metric, verdict_type, best_metric_status
+    )
+
+    # ── Step 7: Persist verdict with delta and confidence ─────────────────────
+    verdict_id = await insert_verdict(
+        claim_id=claim_id,
+        verdict_type=verdict_type,
+        delta=delta,
+        confidence_score=confidence_score,
+    )
+
+    # ── Step 8: Log normalization trace when units were converted ─────────────
+    if normalization_needed:
+        await insert_reasoning_trace(
+            verdict_id=verdict_id,
+            step_index=1,
+            tool_call={
+                "action": "unit_normalization",
+                "claim_metric": claim_metric,
+                "target_value": target_value,
+                "target_unit": target_unit,
+                "actual_value": actual_value,
+                "actual_unit": actual_unit,
+                "delta": delta,
+            },
+            result_summary=(
+                f"Normalized units before delta: "
+                f"target={target_value} ({target_unit}), "
+                f"actual={actual_value} ({actual_unit}), "
+                f"delta={delta}"
+            ),
+            edgar_filing_ref=None,
+        )
 
     return VerificationResult(
         claim_id=claim_id,
@@ -244,4 +422,6 @@ async def verify_claim(
         actual_value=actual_value,
         actuals_quarter=actuals_quarter,
         mapping_rationale=decision.mapping_rationale,
+        delta=delta,
+        confidence_score=float(confidence_score),
     )

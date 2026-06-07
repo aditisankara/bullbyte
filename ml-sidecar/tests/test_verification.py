@@ -115,6 +115,11 @@ def _patch_all(
         "src.services.verification_service.insert_verdict",
         new=AsyncMock(return_value=insert_verdict_return),
     ))
+    # NEW (story 4.4): patch insert_reasoning_trace so normalization trace doesn't hit DB
+    stack.enter_context(patch(
+        "src.services.verification_service.insert_reasoning_trace",
+        new=AsyncMock(return_value="trace-uuid-mock"),
+    ))
     return stack
 
 
@@ -267,6 +272,8 @@ async def test_verdict_stored_screaming_snake_case():
               new=AsyncMock(return_value=_make_financials())),
         patch("src.core.llm.base._provider", MagicMock(complete=AsyncMock(return_value=_make_llm_response("DELIVERED")))),
         patch("src.services.verification_service.insert_verdict", new=mock_insert),
+        patch("src.services.verification_service.insert_reasoning_trace",
+              new=AsyncMock(return_value="trace-uuid-mock")),
     ):
         result = await verify_claim(**CLAIM_KWARGS)
 
