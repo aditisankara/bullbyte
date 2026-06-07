@@ -1,6 +1,6 @@
 # Story 4.6: CEO Delivery Score Computation
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -46,29 +46,29 @@ And it uses `pool.fetch()` with the same pool-acquire pattern as all other helpe
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add `get_verdicts_for_ticker()` to `ml-sidecar/src/db/queries.py` (AC: 5)
-  - [ ] Add after `get_executive_at_date()` at the bottom of the file
-  - [ ] Use `pool.fetch()` with the SQL in Dev Notes
-  - [ ] Returns `list[asyncpg.Record]` where each row has `verdict_type` (text) and `count` (int)
+- [x] Task 1: Add `get_verdicts_for_ticker()` to `ml-sidecar/src/db/queries.py` (AC: 5)
+  - [x] Add after `get_executive_at_date()` at the bottom of the file
+  - [x] Use `pool.fetch()` with the SQL in Dev Notes
+  - [x] Returns `list[asyncpg.Record]` where each row has `verdict_type` (text) and `count` (int)
 
-- [ ] Task 2: Create `ml-sidecar/src/models/score_models.py` (AC: 1, 2, 3)
-  - [ ] Define `CeoDeliveryScore(BaseModel)` — fields in Dev Notes
-  - [ ] Use `ConfigDict(alias_generator=to_camel, populate_by_name=True)` for camelCase serialization (consistent with other models)
+- [x] Task 2: Create `ml-sidecar/src/models/score_models.py` (AC: 1, 2, 3)
+  - [x] Define `CeoDeliveryScore(BaseModel)` — fields in Dev Notes
+  - [x] Use `ConfigDict(alias_generator=to_camel, populate_by_name=True)` for camelCase serialization (consistent with other models)
 
-- [ ] Task 3: Create `ml-sidecar/src/services/scoring_service.py` (AC: 1, 2, 3, 4)
-  - [ ] Define `async def compute_ceo_delivery_score(ticker: str) -> CeoDeliveryScore`
-  - [ ] Call `get_verdicts_for_ticker(ticker)` and accumulate counts per verdict_type
-  - [ ] Compute `score = delivered / (delivered + missed)` as `float | None`
-  - [ ] Return `null` score (not `0.0`) when `total_resolved == 0`
-  - [ ] Include `context_message` in all paths — see Dev Notes for wording
+- [x] Task 3: Create `ml-sidecar/src/services/scoring_service.py` (AC: 1, 2, 3, 4)
+  - [x] Define `async def compute_ceo_delivery_score(ticker: str) -> CeoDeliveryScore`
+  - [x] Call `get_verdicts_for_ticker(ticker)` and accumulate counts per verdict_type
+  - [x] Compute `score = delivered / (delivered + missed)` as `float | None`
+  - [x] Return `null` score (not `0.0`) when `total_resolved == 0`
+  - [x] Include `context_message` in all paths — see Dev Notes for wording
 
-- [ ] Task 4: Create `ml-sidecar/tests/test_scoring.py` (AC: 1, 2, 3)
-  - [ ] `test_score_computed_from_mixed_verdicts` — DELIVERED + MISSED + INSUFFICIENT_DATA → correct ratio
-  - [ ] `test_total_resolved_excludes_insufficient_and_pending` — verify counts per AC1
-  - [ ] `test_score_null_when_no_resolved_claims` — all PENDING/INSUFFICIENT_DATA → score is None
-  - [ ] `test_score_null_when_no_verdicts_at_all` — empty ticker → score is None, no exception
-  - [ ] `test_context_message_always_present` — every return has a non-empty `context_message`
-  - [ ] `test_get_verdicts_for_ticker_query_passes_ticker` — verify pool.fetch called with correct SQL and ticker arg
+- [x] Task 4: Create `ml-sidecar/tests/test_scoring.py` (AC: 1, 2, 3)
+  - [x] `test_score_computed_from_mixed_verdicts` — DELIVERED + MISSED + INSUFFICIENT_DATA → correct ratio
+  - [x] `test_total_resolved_excludes_insufficient_and_pending` — verify counts per AC1
+  - [x] `test_score_null_when_no_resolved_claims` — all PENDING/INSUFFICIENT_DATA → score is None
+  - [x] `test_score_null_when_no_verdicts_at_all` — empty ticker → score is None, no exception
+  - [x] `test_context_message_always_present` — every return has a non-empty `context_message`
+  - [x] `test_get_verdicts_for_ticker_query_passes_ticker` — verify pool.fetch called with correct SQL and ticker arg
 
 ## Dev Notes
 
@@ -419,18 +419,26 @@ Story 4.6 creates the service; it is not yet wired into the analysis pipeline or
 ### Agent Model Used
 
 claude-sonnet-4-6 (story creation via bmad-create-story, 2026-06-07)
+claude-sonnet-4-6 (story implementation via bmad-dev-story, 2026-06-07)
 
 ### Debug Log References
 
 ### Completion Notes List
 
+- Added `get_verdicts_for_ticker(ticker)` to `queries.py` — joins verdicts → claims → companies, groups by verdict_type, returns empty list for unknown tickers
+- Created `score_models.py` with `CeoDeliveryScore` Pydantic model (camelCase aliases, `score: float | None`, `total_resolved = delivered + missed` only)
+- Created `scoring_service.py` with `compute_ceo_delivery_score(ticker)` — pure read service, no LLM, no writes; returns `score=None` when `total_resolved == 0` to prevent divide-by-zero
+- `REVISED` verdict type silently excluded via `counts.get()` defaulting to 0 — deferred to Phase 2 per architecture guardrails
+- 6/6 new tests pass; 143/143 full suite pass (zero regressions)
+
 ### File List
 
 - ml-sidecar/src/models/score_models.py (NEW)
 - ml-sidecar/src/services/scoring_service.py (NEW)
-- ml-sidecar/src/db/queries.py (UPDATE — append `get_verdicts_for_ticker()`)
+- ml-sidecar/src/db/queries.py (UPDATE — appended `get_verdicts_for_ticker()`)
 - ml-sidecar/tests/test_scoring.py (NEW)
 
 ## Change Log
 
 - 2026-06-07: Story created — ready for dev
+- 2026-06-07: Implemented story 4.6 — added `get_verdicts_for_ticker()` query, created `CeoDeliveryScore` model and `compute_ceo_delivery_score()` service, created `test_scoring.py` with 6 tests covering all ACs. 143/143 tests pass.
