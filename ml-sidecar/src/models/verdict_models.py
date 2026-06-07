@@ -17,3 +17,5 @@ class VerificationResult(BaseModel):
     actual_value: str | None
     actuals_quarter: str
     mapping_rationale: str
+    delta: str | None = None
+    confidence_score: float | None = None
