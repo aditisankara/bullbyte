@@ -80,4 +80,25 @@ describe('SearchInputComponent', () => {
     expect(el.querySelector('.search__status--ok')).not.toBeNull();
     expect(el.querySelector('app-error-state')).toBeNull();
   });
+
+  it('renders the provided errorKind instead of ticker-not-found (6.1)', () => {
+    const fixture = render('error');
+    fixture.componentRef.setInput('errorKind', 'edgar-unavailable');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.error__heading')?.textContent).toContain(
+      'EDGAR is unavailable',
+    );
+  });
+
+  it('focuses the input on first render when autofocus is set (6.1 AC1)', async () => {
+    const fixture = TestBed.createComponent(SearchInputComponent);
+    fixture.componentRef.setInput('autofocus', true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const input = (fixture.nativeElement as HTMLElement).querySelector(
+      'input.search__input',
+    );
+    expect(document.activeElement).toBe(input);
+  });
 });

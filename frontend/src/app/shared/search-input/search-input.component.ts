@@ -2,12 +2,17 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  afterNextRender,
+  booleanAttribute,
   input,
   output,
   signal,
   viewChild,
 } from '@angular/core';
-import { ErrorStateComponent } from '../error-state/error-state.component';
+import {
+  ErrorStateComponent,
+  ErrorStateKind,
+} from '../error-state/error-state.component';
 
 /** The four states of the search loading union (AC1). */
 export type SearchState = 'idle' | 'loading' | 'success' | 'error';
@@ -83,7 +88,7 @@ export type SearchState = 'idle' | 'loading' | 'success' | 'error';
 
     @if (state() === 'error') {
       <app-error-state
-        kind="ticker-not-found"
+        [kind]="errorKind()"
         [context]="submittedTicker()"
         (retry)="onRetry()"
       />
@@ -207,6 +212,12 @@ export class SearchInputComponent {
   /** Current loading-union state, driven by the parent (6.1). */
   readonly state = input<SearchState>('idle');
 
+  /** Which error state to render when state is 'error' (6.1: 404 vs network). */
+  readonly errorKind = input<ErrorStateKind>('ticker-not-found');
+
+  /** Focus the input on first render (6.1 AC1: type immediately). */
+  readonly autofocus = input(false, { transform: booleanAttribute });
+
   /** Emitted on submit with the normalised (trimmed, uppercased) ticker. */
   readonly tickerSearch = output<string>();
 
@@ -215,6 +226,14 @@ export class SearchInputComponent {
   protected readonly submittedTicker = signal('');
 
   private readonly inputRef = viewChild<ElementRef<HTMLInputElement>>('ticker');
+
+  constructor() {
+    afterNextRender(() => {
+      if (this.autofocus()) {
+        this.inputRef()?.nativeElement.focus();
+      }
+    });
+  }
 
   protected onSubmit(event: Event): void {
     event.preventDefault();
