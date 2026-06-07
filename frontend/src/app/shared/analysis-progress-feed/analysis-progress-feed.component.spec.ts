@@ -84,6 +84,27 @@ describe('AnalysisProgressFeedComponent', () => {
     expect(el.querySelectorAll('.step').length).toBe(2);
   });
 
+  it('renders no rows with no events by default, but shows the opt-in pending row (6.2 AC2)', () => {
+    // default off — 2.3 behaviour unchanged
+    expect((render([]).nativeElement as HTMLElement).querySelectorAll('.step').length).toBe(0);
+
+    const fixture = TestBed.createComponent(AnalysisProgressFeedComponent);
+    fixture.componentRef.setInput('events', []);
+    fixture.componentRef.setInput('pending', 'Starting analysis…');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const rows = el.querySelectorAll('.step');
+    expect(rows.length).toBe(1);
+    expect(rows[0].getAttribute('data-status')).toBe('in-progress');
+    expect(rowText(el)).toEqual(['Starting analysis…']);
+
+    // first real event arrives — the pending row gives way to the live rows
+    fixture.componentRef.setInput('events', [ev('analysis-started', 0, 'Started…')]);
+    fixture.detectChanges();
+    expect(rowText(el)).toEqual(['Started…', 'Working…']);
+  });
+
   it('renders the failed terminal step with the error treatment', () => {
     const el = render([
       ev('analysis-started', 0, 'Started…'),

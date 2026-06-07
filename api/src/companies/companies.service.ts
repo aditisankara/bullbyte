@@ -26,7 +26,7 @@ export class CompaniesService {
 		}
 
 		const [latestJob] = await this.db
-			.select({ status: analysisJobs.status })
+			.select({ id: analysisJobs.id, status: analysisJobs.status })
 			.from(analysisJobs)
 			.where(eq(analysisJobs.companyId, company.id))
 			.orderBy(desc(analysisJobs.createdAt))
@@ -40,6 +40,7 @@ export class CompaniesService {
 				? company.lastAnalysedAt.toISOString()
 				: null,
 			jobStatus: latestJob?.status ?? null,
+			latestJobId: latestJob?.id ?? null,
 		};
 	}
 }

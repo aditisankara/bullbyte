@@ -7,6 +7,11 @@ import {
 import { CompanyComponent } from './company.component';
 import { httpErrorInterceptor } from '../../core/interceptors/http-error.interceptor';
 import { CompanySummary } from '../../core/api/company.models';
+import {
+  FakeEventSource,
+  progressEvent,
+  provideFakeEventSource,
+} from '../../core/api/testing/fake-event-source';
 import { environment } from '../../../environments/environment';
 
 const SUMMARY: CompanySummary = {
@@ -15,17 +20,29 @@ const SUMMARY: CompanySummary = {
   name: 'Tesla, Inc.',
   lastAnalysedAt: '2026-06-01T00:00:00.000Z',
   jobStatus: 'COMPLETED',
+  latestJobId: 'job-1',
+};
+
+/** Summary mid-analysis — the live feed should render instead of the layout. */
+const RUNNING_SUMMARY: CompanySummary = {
+  ...SUMMARY,
+  lastAnalysedAt: null,
+  jobStatus: 'RUNNING',
+  latestJobId: 'job-9',
 };
 
 describe('CompanyComponent', () => {
   let http: HttpTestingController;
+  let sources: FakeEventSource[];
 
   beforeEach(async () => {
+    sources = [];
     await TestBed.configureTestingModule({
       imports: [CompanyComponent],
       providers: [
         provideHttpClient(withInterceptors([httpErrorInterceptor])),
         provideHttpClientTesting(),
+        provideFakeEventSource(sources),
       ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
@@ -90,6 +107,37 @@ describe('CompanyComponent', () => {
     expect(el.querySelector('app-error-state')).not.toBeNull();
     expect(el.textContent).toContain('No filings found');
     expect(el.textContent).not.toContain('TICKER_NOT_FOUND');
+  });
+
+  it('renders the live progress feed instead of the layout while a run is live (6.2 AC1)', () => {
+    const fixture = render();
+    http.expectOne(`${environment.apiBaseUrl}/companies/TSLA`).flush(RUNNING_SUMMARY);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-analysis-progress')).not.toBeNull();
+    expect(el.querySelector('app-company-page-layout')).toBeNull();
+    expect(sources.length).toBe(1);
+    expect(sources[0].url).toBe(`${environment.apiBaseUrl}/jobs/job-9/progress`);
+  });
+
+  it('refetches the summary when the live run completes, then renders the dashboard (6.2 AC3)', () => {
+    const fixture = render();
+    http.expectOne(`${environment.apiBaseUrl}/companies/TSLA`).flush(RUNNING_SUMMARY);
+    fixture.detectChanges();
+
+    sources[0].emit(progressEvent('analysis-complete', { jobId: 'job-9' }));
+    fixture.detectChanges();
+
+    // (completed) → load() refetches without a manual page refresh.
+    http
+      .expectOne(`${environment.apiBaseUrl}/companies/TSLA`)
+      .flush({ ...SUMMARY, latestJobId: 'job-9' });
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-analysis-progress')).toBeNull();
+    expect(el.querySelector('app-company-page-layout')).not.toBeNull();
   });
 
   it('refetches when the bound ticker changes (URL is the source of truth)', () => {
