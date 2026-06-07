@@ -10,6 +10,8 @@ import { AppService } from './app.service';
 import { DrizzleModule } from './db/drizzle.module';
 import { JobsModule } from './jobs/jobs.module';
 import { CompaniesModule } from './companies/companies.module';
+import { ScoreModule } from './score/score.module';
+import { VerdictsModule } from './verdicts/verdicts.module';
 import { appValidationSchema } from './config/app.config';
 import { createWinstonConfig } from './config/winston.config';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -57,6 +59,8 @@ import { MlSidecarService } from './common/ml-sidecar.service';
 		}),
 		JobsModule,
 		CompaniesModule,
+		ScoreModule,
+		VerdictsModule,
 	],
 	controllers: [AppController],
 	providers: [
