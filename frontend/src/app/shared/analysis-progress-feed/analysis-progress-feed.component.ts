@@ -140,6 +140,12 @@ export class AnalysisProgressFeedComponent {
    * (e.g. "Verifying claim 3 of 12…"). Shown only while the run is live.
    */
   readonly activeLabel = input<string>();
+  /**
+   * Opt-in (6.2): label for an in-progress row shown *before* the first event
+   * arrives, so a freshly opened stream is never blank (AC2). Default off —
+   * with no events and no `pending`, the feed renders zero rows as before.
+   */
+  readonly pending = input<string>();
 
   /** True while a non-terminal run is in flight. */
   protected readonly running = computed(() => {
@@ -155,6 +161,16 @@ export class AnalysisProgressFeedComponent {
       message: e.message,
       timestamp: e.timestamp,
     }));
+
+    const pendingLabel = this.pending();
+    if (list.length === 0 && pendingLabel) {
+      rows.push({
+        key: 'pending',
+        status: 'in-progress',
+        message: pendingLabel,
+        timestamp: '',
+      });
+    }
 
     if (this.running()) {
       const last = list[list.length - 1];
