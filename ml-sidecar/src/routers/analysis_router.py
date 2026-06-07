@@ -18,6 +18,7 @@ from src.db.queries import (
 )
 from src.models.progress_models import ProgressEvent
 from src.services.extraction_service import extract_claims
+from src.services.verification_service import verify_claim
 
 router = APIRouter()
 logger = get_logger("ml-sidecar.analysis_router")
@@ -138,7 +139,7 @@ async def _do_extraction(ticker: str, job_id: str) -> None:
                 }
                 for claim in result.claims
             ]
-            await insert_claim_batch(claim_dicts)
+            claim_ids = await insert_claim_batch(claim_dicts)
             await emit_progress(
                 ProgressEvent(
                     event="claims-extracted",
@@ -149,6 +150,33 @@ async def _do_extraction(ticker: str, job_id: str) -> None:
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 )
             )
+
+            for claim_id, claim in zip(claim_ids, result.claims):
+                verification_result = await verify_claim(
+                    claim_id=claim_id,
+                    claim_quarter=claim.quarter,
+                    claim_metric=claim.metric,
+                    target_value=claim.target_value,
+                    target_unit=claim.target_unit,
+                    ticker=ticker,
+                    job_id=job_id,
+                    raw_quote=claim.raw_quote,
+                    timeframe=claim.timeframe,
+                )
+                step += 1
+                await emit_progress(
+                    ProgressEvent(
+                        event="claim-verified",
+                        jobId=job_id,
+                        stepIndex=step,
+                        totalSteps=total_steps,
+                        message=(
+                            f"Verified {claim.metric} for {ticker} {claim.quarter}: "
+                            f"{verification_result.verdict_type}"
+                        ),
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                    )
+                )
 
         step += 1
 

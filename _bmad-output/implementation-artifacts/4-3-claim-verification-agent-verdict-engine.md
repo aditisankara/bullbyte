@@ -1,6 +1,6 @@
 # Story 4.3: Claim Verification Agent — Verdict Engine
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -55,33 +55,33 @@ And `analysis_router.py` captures the `claim_ids` returned by `insert_claim_batc
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create `ml-sidecar/src/models/verdict_models.py` (AC: 2, 3)
-  - [ ] Define `VerdictType = Literal["DELIVERED", "MISSED", "INSUFFICIENT_DATA"]`
-  - [ ] Define `VerificationResult(BaseModel)` with fields: `claim_id: str`, `verdict_id: str`, `verdict_type: VerdictType`, `actual_value: str | None`, `actuals_quarter: str`, `mapping_rationale: str`
-  - [ ] Apply `model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)` to `VerificationResult`
-  - [ ] No `confidence_score` or `delta` fields — those are story 4.4 additions
+- [x] Task 1: Create `ml-sidecar/src/models/verdict_models.py` (AC: 2, 3)
+  - [x] Define `VerdictType = Literal["DELIVERED", "MISSED", "INSUFFICIENT_DATA"]`
+  - [x] Define `VerificationResult(BaseModel)` with fields: `claim_id: str`, `verdict_id: str`, `verdict_type: VerdictType`, `actual_value: str | None`, `actuals_quarter: str`, `mapping_rationale: str`
+  - [x] Apply `model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)` to `VerificationResult`
+  - [x] No `confidence_score` or `delta` fields — those are story 4.4 additions
 
-- [ ] Task 2: Create `ml-sidecar/src/services/verification_service.py` (AC: 1, 2, 3, 4, 5)
-  - [ ] Import only from `src.core.llm.base` (never anthropic/openai directly)
-  - [ ] Copy `_PRICING` dict from `extraction_service.py` and `_estimate_cost()` helper (or import from shared module — see note below)
-  - [ ] Define `_VERIFICATION_SYSTEM_PROMPT` (see Dev Notes for exact prompt text)
-  - [ ] Implement `async def verify_claim(claim_id, claim_quarter, claim_metric, target_value, target_unit, ticker, job_id) -> VerificationResult`:
-    - [ ] Call `align_call_to_actuals(ticker, claim_quarter)` → `AlignmentDecision`
-    - [ ] If `decision.status == "FETCH_ERROR"` or `decision.filing_url == ""` → return INSUFFICIENT_DATA immediately with log
-    - [ ] Call `ingest_financial_actuals(ticker, decision.actuals_quarter)` → `FinancialsResult`
-    - [ ] If `financials.status in ("FETCH_ERROR", "FILING_NOT_YET_AVAILABLE")` → return INSUFFICIENT_DATA with log
-    - [ ] Build LLM messages list: system prompt + user message with claim + formatted actuals
-    - [ ] Call `await provider.complete(messages=messages)` — `provider = get_provider()`
-    - [ ] Emit LLM cost log (NFR18): `logger.info("LLM call completed", extra={model, tokens_used, estimated_cost_usd, ticker, jobId})`
-    - [ ] Parse LLM JSON response: `{"verdict": "DELIVERED"|"MISSED"|"INSUFFICIENT_DATA", "reasoning": "..."}`
-    - [ ] On JSON parse failure or invalid verdict → `INSUFFICIENT_DATA` with warning log (never crash)
-    - [ ] Call `await insert_verdict(claim_id=claim_id, verdict_type=verdict_type)` → `verdict_id`
-    - [ ] Return `VerificationResult(claim_id, verdict_id, verdict_type, actual_value, actuals_quarter, mapping_rationale)`
+- [x] Task 2: Create `ml-sidecar/src/services/verification_service.py` (AC: 1, 2, 3, 4, 5)
+  - [x] Import only from `src.core.llm.base` (never anthropic/openai directly)
+  - [x] Copy `_PRICING` dict from `extraction_service.py` and `_estimate_cost()` helper (or import from shared module — see note below)
+  - [x] Define `_VERIFICATION_SYSTEM_PROMPT` (see Dev Notes for exact prompt text)
+  - [x] Implement `async def verify_claim(claim_id, claim_quarter, claim_metric, target_value, target_unit, ticker, job_id) -> VerificationResult`:
+    - [x] Call `align_call_to_actuals(ticker, claim_quarter)` → `AlignmentDecision`
+    - [x] If `decision.status == "FETCH_ERROR"` or `decision.filing_url == ""` → return INSUFFICIENT_DATA immediately with log
+    - [x] Call `ingest_financial_actuals(ticker, decision.actuals_quarter)` → `FinancialsResult`
+    - [x] If `financials.status in ("FETCH_ERROR", "FILING_NOT_YET_AVAILABLE")` → return INSUFFICIENT_DATA with log
+    - [x] Build LLM messages list: system prompt + user message with claim + formatted actuals
+    - [x] Call `await provider.complete(messages=messages)` — `provider = get_provider()`
+    - [x] Emit LLM cost log (NFR18): `logger.info("LLM call completed", extra={model, tokens_used, estimated_cost_usd, ticker, jobId})`
+    - [x] Parse LLM JSON response: `{"verdict": "DELIVERED"|"MISSED"|"INSUFFICIENT_DATA", "reasoning": "..."}`
+    - [x] On JSON parse failure or invalid verdict → `INSUFFICIENT_DATA` with warning log (never crash)
+    - [x] Call `await insert_verdict(claim_id=claim_id, verdict_type=verdict_type)` → `verdict_id`
+    - [x] Return `VerificationResult(claim_id, verdict_id, verdict_type, actual_value, actuals_quarter, mapping_rationale)`
 
-- [ ] Task 3: Modify `ml-sidecar/src/routers/analysis_router.py` (AC: 6)
-  - [ ] Add import: `from src.services.verification_service import verify_claim`
-  - [ ] In `_do_extraction()`, capture the return value of `insert_claim_batch()`: `claim_ids = await insert_claim_batch(claim_dicts)`
-  - [ ] After emitting `claims-extracted`, add a verification loop:
+- [x] Task 3: Modify `ml-sidecar/src/routers/analysis_router.py` (AC: 6)
+  - [x] Add import: `from src.services.verification_service import verify_claim`
+  - [x] In `_do_extraction()`, capture the return value of `insert_claim_batch()`: `claim_ids = await insert_claim_batch(claim_dicts)`
+  - [x] After emitting `claims-extracted`, add a verification loop:
     ```python
     for claim_id, claim in zip(claim_ids, result.claims):
         verification_result = await verify_claim(
@@ -103,18 +103,18 @@ And `analysis_router.py` captures the `claim_ids` returned by `insert_claim_batc
             timestamp=datetime.now(timezone.utc).isoformat(),
         ))
     ```
-  - [ ] `total_steps` stays as `len(transcripts) + 1`; verification events are emitted with `stepIndex` incrementing beyond `totalSteps` — this is acceptable (frontend clamps progress to 100%)
+  - [x] `total_steps` stays as `len(transcripts) + 1`; verification events are emitted with `stepIndex` incrementing beyond `totalSteps` — this is acceptable (frontend clamps progress to 100%)
 
-- [ ] Task 4: Write `ml-sidecar/tests/test_verification.py` (AC: 1, 2, 3, 4, 5, 6)
-  - [ ] `test_delivered_verdict` — mock temporal aligner returns ALIGNED + mock financials returns matching metric + mock LLM returns `{"verdict": "DELIVERED", "reasoning": "Revenue matched"}` → assert `result.verdict_type == "DELIVERED"` and `insert_verdict` called with `verdict_type="DELIVERED"`
-  - [ ] `test_missed_verdict` — mock LLM returns `{"verdict": "MISSED", "reasoning": "Revenue fell short"}` → assert `result.verdict_type == "MISSED"`
-  - [ ] `test_insufficient_data_on_alignment_fetch_error` — mock `align_call_to_actuals` returns `AlignmentDecision(status="FETCH_ERROR")` → assert `result.verdict_type == "INSUFFICIENT_DATA"` without calling financials or LLM
-  - [ ] `test_insufficient_data_on_filing_not_yet_available` — mock `ingest_financial_actuals` returns `FinancialsResult(status="FILING_NOT_YET_AVAILABLE")` → `INSUFFICIENT_DATA` without calling LLM
-  - [ ] `test_insufficient_data_on_financials_fetch_error` — mock `ingest_financial_actuals` returns `FinancialsResult(status="FETCH_ERROR")` → `INSUFFICIENT_DATA`
-  - [ ] `test_insufficient_data_on_llm_parse_failure` — mock LLM returns non-JSON → `INSUFFICIENT_DATA` (no crash)
-  - [ ] `test_llm_cost_logged` — mock LLM returns valid verdict; assert `caplog` contains `"LLM call completed"` with `model`, `tokens_used`, `estimated_cost_usd`, `ticker`, `jobId` fields
-  - [ ] `test_verdict_stored_screaming_snake_case` — mock `insert_verdict` (patch `src.services.verification_service.insert_verdict`); assert it was called with `verdict_type="DELIVERED"` (all caps)
-  - [ ] `test_llm_called_via_abstraction_only` — use `inspect.getsource` or `ast.parse` to assert `verification_service.py` does NOT contain `import anthropic` or `import openai` (same pattern as `test_extraction.py:test_llm_called_via_abstraction_only`)
+- [x] Task 4: Write `ml-sidecar/tests/test_verification.py` (AC: 1, 2, 3, 4, 5, 6)
+  - [x] `test_delivered_verdict` — mock temporal aligner returns ALIGNED + mock financials returns matching metric + mock LLM returns `{"verdict": "DELIVERED", "reasoning": "Revenue matched"}` → assert `result.verdict_type == "DELIVERED"` and `insert_verdict` called with `verdict_type="DELIVERED"`
+  - [x] `test_missed_verdict` — mock LLM returns `{"verdict": "MISSED", "reasoning": "Revenue fell short"}` → assert `result.verdict_type == "MISSED"`
+  - [x] `test_insufficient_data_on_alignment_fetch_error` — mock `align_call_to_actuals` returns `AlignmentDecision(status="FETCH_ERROR")` → assert `result.verdict_type == "INSUFFICIENT_DATA"` without calling financials or LLM
+  - [x] `test_insufficient_data_on_filing_not_yet_available` — mock `ingest_financial_actuals` returns `FinancialsResult(status="FILING_NOT_YET_AVAILABLE")` → `INSUFFICIENT_DATA` without calling LLM
+  - [x] `test_insufficient_data_on_financials_fetch_error` — mock `ingest_financial_actuals` returns `FinancialsResult(status="FETCH_ERROR")` → `INSUFFICIENT_DATA`
+  - [x] `test_insufficient_data_on_llm_parse_failure` — mock LLM returns non-JSON → `INSUFFICIENT_DATA` (no crash)
+  - [x] `test_llm_cost_logged` — mock LLM returns valid verdict; assert `caplog` contains `"LLM call completed"` with `model`, `tokens_used`, `estimated_cost_usd`, `ticker`, `jobId` fields
+  - [x] `test_verdict_stored_screaming_snake_case` — mock `insert_verdict` (patch `src.services.verification_service.insert_verdict`); assert it was called with `verdict_type="DELIVERED"` (all caps)
+  - [x] `test_llm_called_via_abstraction_only` — use `inspect.getsource` or `ast.parse` to assert `verification_service.py` does NOT contain `import anthropic` or `import openai` (same pattern as `test_extraction.py:test_llm_called_via_abstraction_only`)
 
 ## Dev Notes
 
@@ -526,4 +526,18 @@ claude-sonnet-4-6 (story creation via bmad-create-story, 2026-06-06)
 
 ### Completion Notes List
 
+- Implemented all 4 tasks; 9/9 new tests pass, 118/118 suite-wide tests pass (0 regressions).
+- `verdict_models.py` — `VerdictType` literal + `VerificationResult` with `to_camel` alias generator; no `delta`/`confidence_score` (story 4.4).
+- `verification_service.py` — `verify_claim()` chains `align_call_to_actuals` → `ingest_financial_actuals` → LLM → `insert_verdict`. Never raises: EDGAR failure paths produce `INSUFFICIENT_DATA` with `logger.warning`. LLM cost logged as `logger.info("LLM call completed", ...)` per NFR18. No direct `anthropic`/`openai` imports (NFR17).
+- `analysis_router.py` — `insert_claim_batch()` return value now captured as `claim_ids`; post-extraction verification loop emits `claim-verified` SSE events per claim with `step` incrementing from the current transcript step.
+- `test_verification.py` — 9 tests covering: DELIVERED, MISSED, alignment FETCH_ERROR (no LLM/financials called), FILING_NOT_YET_AVAILABLE, financials FETCH_ERROR, LLM parse failure, cost log fields, SCREAMING_SNAKE_CASE enforcement, NFR17 source inspection.
+- Pre-existing failures unchanged: `test_ingestion.py` (12, lxml missing), `test_yfinance_service.py` (6, yfinance missing).
+
 ### File List
+
+- `ml-sidecar/src/models/verdict_models.py` (new)
+- `ml-sidecar/src/services/verification_service.py` (new)
+- `ml-sidecar/tests/test_verification.py` (new)
+- `ml-sidecar/src/routers/analysis_router.py` (modified)
+- `_bmad-output/implementation-artifacts/4-3-claim-verification-agent-verdict-engine.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`

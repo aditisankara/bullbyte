@@ -42,13 +42,14 @@ export class MlSidecarService {
 	 * Called only by the BullMQ analysis worker (story 5.1).
 	 */
 	analyze(
-		ticker: string
+		ticker: string,
+		jobId: string
 	): Observable<AxiosResponse<{ jobId: string; status: string }>> {
 		return this.httpService
 			.post<{
 				jobId: string;
 				status: string;
-			}>(`${this.baseUrl}/analyze/${ticker}`)
+			}>(`${this.baseUrl}/analyze/${ticker}`, { jobId })
 			.pipe(
 				timeout(SIDECAR_TIMEOUT_MS),
 				catchError(() =>
