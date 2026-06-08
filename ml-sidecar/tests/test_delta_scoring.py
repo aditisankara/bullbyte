@@ -149,8 +149,10 @@ async def test_delta_calculated_for_delivered():
 
     call_kwargs = mock_insert.call_args.kwargs
     assert call_kwargs["delta"] is not None
+    assert isinstance(call_kwargs["delta"], str), f"delta must be str, got {type(call_kwargs['delta'])}"
     assert call_kwargs["confidence_score"] is not None
     assert result.delta is not None
+    assert isinstance(result.delta, str), f"result.delta must be str, got {type(result.delta)}"
     assert result.confidence_score is not None
 
 

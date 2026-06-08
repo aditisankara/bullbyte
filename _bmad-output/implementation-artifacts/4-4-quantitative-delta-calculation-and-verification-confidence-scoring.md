@@ -1,6 +1,6 @@
 # Story 4.4: Quantitative Delta Calculation & Verification Confidence Scoring
 
-Status: review
+Status: done
 
 ## Story
 
@@ -84,6 +84,20 @@ And `result.confidence_score` is a float between 0 and 1
   - [x] `test_low_confidence_verdict_still_written` — assert `insert_verdict` called even for low-confidence result
   - [x] `test_normalization_trace_written_when_units_differ` — target_unit="billion USD", actual metric unit="USD"; assert `insert_reasoning_trace` called with a non-None `result_summary`
   - [x] `test_no_trace_when_same_units` — same units on both sides; assert `insert_reasoning_trace` NOT called
+
+### Review Findings
+
+- [x] [Review][Patch] `"raw"` vs `"currency"/"percent"` tag mismatch doesn't trigger unit conflict — `_compute_delta` only checks `{currency,percent}` vs `{currency,percent}` mismatches; if actual resolves to tag `"raw"` (unrecognised unit) while target is `"currency"`, delta is computed from incompatible unit families without triggering INSUFFICIENT_DATA. Decision: should `"raw"` vs `"currency"` or `"percent"` be a conflict? [`ml-sidecar/src/services/verification_service.py`]
+- [x] [Review][Patch] Over-broad unit suffix matching in `_parse_numeric_value` — `unit.endswith("b") and len(unit) <= 3` matches `"rb"`, `"lb"`, `"gb"`, `"mb"` as billions; `"t"` branch matches `"ct"`, `"mt"` as trillions. Use an explicit allowlist instead [`ml-sidecar/src/services/verification_service.py`]
+- [x] [Review][Patch] Embedded `%` in `value_str` not detected as percent when `unit_str` is None — `value_str="15%"` has `%` stripped before the percent branch checks `unit_str`; if `unit_str=None`, the value is tagged `"raw"` and a meaningless delta is computed instead of treating it as percent [`ml-sidecar/src/services/verification_service.py`]
+- [x] [Review][Patch] `matched_metric` from LLM JSON not validated as string — `data.get("matched_metric")` can return an int or list if LLM misbehaves; calling `.lower()` on a non-string raises `AttributeError` [`ml-sidecar/src/services/verification_service.py`]
+- [x] [Review][Patch] `claim_metric` not stripped before substring match in `_compute_confidence` — leading/trailing spaces in `claim_metric` cause a direct match to be mis-scored as inferred (0.60 instead of 0.90) [`ml-sidecar/src/services/verification_service.py`]
+- [x] [Review][Patch] `_insufficient_data()` omits `delta=None` from `insert_verdict()` call — AC5 requires `delta` keyword argument be passed explicitly [`ml-sidecar/src/services/verification_service.py`]
+- [x] [Review][Patch] `test_delta_calculated_for_delivered` doesn't assert `delta` is `str` type — architecture guardrail requires delta as `str` in Python; `is not None` passes for `float` or `Decimal` [`ml-sidecar/tests/test_delta_scoring.py`]
+- [x] [Review][Defer] Float arithmetic for financial delta — `_parse_numeric_value` returns `float`, delta computed in IEEE-754; Decimal would eliminate precision loss on large currency values [`ml-sidecar/src/services/verification_service.py`] — deferred, pre-existing float-vs-Decimal design; not spec-required
+- [x] [Review][Defer] `"raw"` vs `"raw"` magnitude mismatch silently accepted — delta between target `"2.5"` (multiplier) and actual `"2500000000"` (absolute) produces a meaningless value with no warning [`ml-sidecar/src/services/verification_service.py`] — deferred, out of scope; requires heuristic threshold not specified in story
+- [x] [Review][Defer] No DB transaction wrapping `insert_verdict` + `insert_reasoning_trace` — partial failure mid-trace leaves an orphaned verdict row; no rollback mechanism [`ml-sidecar/src/services/verification_service.py`] — deferred, pre-existing gap; transaction wrapping belongs in a future DB reliability story
+- [x] [Review][Defer] `step_index=1` hardcoded for normalization trace entries — future callers writing step 0 or multiple steps will conflict [`ml-sidecar/src/services/verification_service.py`] — deferred, pre-existing; address when multiple trace steps per verdict are needed
 
 ## Dev Notes
 

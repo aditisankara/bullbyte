@@ -1,5 +1,30 @@
 # Deferred Work
 
+## Deferred from: code review of 4-6-ceo-delivery-score-computation (2026-06-08)
+
+- No error handling on `pool.fetch()` in `get_verdicts_for_ticker` — consistent with all other read helpers in `queries.py`; add structured error logging when a reliability/observability story lands [`ml-sidecar/src/db/queries.py`]
+- No model-level range constraint on `score` field (0.0–1.0) — computation guarantees the range; `Field(ge=0.0, le=1.0)` would be defensive hardening; add in a future model-hardening pass [`ml-sidecar/src/models/score_models.py`]
+- No ticker validation for empty/blank string — `compute_ceo_delivery_score("")` silently returns `score=None`; input validation should be enforced at the API boundary in story 5.6 [`ml-sidecar/src/services/scoring_service.py`]
+
+## Deferred from: code review of 4-5-structured-reasoning-trace-logger (2026-06-08)
+
+- `_make_filing_ref` could produce a malformed ref string (e.g. `"None | AAPL | None | https://..."`) if `filing_type` or `quarter` is `None` while `url` is non-empty — no known trigger path today, but the helper has no type guard on those fields [`ml-sidecar/src/services/verification_service.py:196`]
+- Trace write exceptions propagate past `insert_verdict` in the Step 8 flush loop, contradicting the stated architecture guardrail ("DB write failure is logged, not propagated to caller") — verdict row exists in DB but caller gets an exception and may retry creating a duplicate verdict; wrap trace writes in try/except with a warning log [`ml-sidecar/src/services/verification_service.py:496`]
+
+## Deferred from: code review of 4-4-quantitative-delta-calculation-and-verification-confidence-scoring (2026-06-08)
+
+- Float arithmetic for financial delta — `_parse_numeric_value` returns `float` and delta arithmetic is IEEE-754; Decimal would eliminate precision loss on large currency values (e.g. $383,000,000,000 ± cents); address in a future numeric-precision story [`ml-sidecar/src/services/verification_service.py`]
+- `"raw"` vs `"raw"` magnitude mismatch silently accepted — delta between a multiplier target and raw absolute actual produces a meaningless value with no warning; requires a heuristic magnitude-difference threshold not specified in this story [`ml-sidecar/src/services/verification_service.py`]
+- No DB transaction wrapping `insert_verdict` + `insert_reasoning_trace` — partial failure mid-trace leaves an orphaned verdict row with no rollback; wrapping verdict+traces in a single `asyncpg` transaction belongs in a future DB reliability story [`ml-sidecar/src/services/verification_service.py`]
+- `step_index=1` hardcoded for unit-normalization trace entries — will conflict when multiple trace steps per verdict are written; address when full trace logging (story 4.5+) introduces step sequencing [`ml-sidecar/src/services/verification_service.py`]
+
+## Deferred from: code review of 4-3-claim-verification-agent-verdict-engine (2026-06-07)
+
+- `zip(claim_ids, result.claims)` silently truncates with no assertion — not triggered by current code but a future deduplication step could silently skip tail claims [`ml-sidecar/src/routers/analysis_router.py`]
+- `messages` array passes `{"role": "system", ...}` inside messages list — Anthropic API requires system prompt as top-level param; correctness depends on `provider.complete()` implementation [`ml-sidecar/src/services/verification_service.py`]
+- `get_provider()` called inside per-claim loop — can raise `ValueError` on env misconfiguration; should be resolved once before the loop [`ml-sidecar/src/services/verification_service.py`]
+- `AMBIGUOUS` alignment status would bypass the `filing_url`-based guard if returned with a non-empty URL — not currently produced by the aligner; guard should check `decision.status != "ALIGNED"` explicitly [`ml-sidecar/src/services/verification_service.py`]
+
 ## Deferred from: code review of 4-1-llm-based-numerical-claim-extraction-agent (2026-05-31)
 
 - Unbounded transcript `raw_text` size sent to LLM without token/character guard [`ml-sidecar/src/routers/analysis_router.py`] — transcript size is bounded by EDGAR/press-release ingestion; a hard cap + warning belongs in a later performance/reliability story

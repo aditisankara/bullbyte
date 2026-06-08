@@ -49,7 +49,7 @@
 # that doesn't conflict with the other developer's active story.
 
 generated: "2026-05-01"
-last_updated: "2026-06-07"  # story 1.1 + 1.3 + 1.5 + 1.6 done; Epic 1 complete; 3.1–3.7 done; 3.8 ready-for-dev; Epic 4 started; 4.1 done; 4.2 done; 4.3 review; 4.4 ready-for-dev; 4.5 review; 4.6 ready-for-dev; 2.1–2.6 done + merged to main (PR #82); Epic 2 complete; 5.1–5.4 done; Epic 6 unblocked (6.1 + 6.2); 6.1 done (PR #86); 6.2 review
+last_updated: "2026-06-08"  # story 1.1 + 1.3 + 1.5 + 1.6 done; Epic 1 complete; 3.1–3.7 done; 3.8 ready-for-dev; Epic 4 started; 4.1 done; 4.2 done; 4.3 done; 4.4 done; 4.5 done; 4.6 done; 2.1–2.6 done + merged to main (PR #82); Epic 2 complete; 5.1–5.4 done; Epic 6 unblocked (6.1 + 6.2); 6.1 done (PR #86); 6.2 review
 project: bullbyte
 project_key: NOKEY
 tracking_system: file-system
@@ -122,10 +122,10 @@ development_status:
 
   4-1-llm-based-numerical-claim-extraction-agent: done       # needs 1.3 + Epic 3
   4-2-safe-harbour-boilerplate-filter-and-extraction-confidence-scoring: done  # needs 4.1
-  4-3-claim-verification-agent-verdict-engine: review               # needs 4.1 + 3.x
-  4-4-quantitative-delta-calculation-and-verification-confidence-scoring: review # needs 4.3
-  4-5-structured-reasoning-trace-logger: review                     # needs 4.3; parallel with 4.4
-  4-6-ceo-delivery-score-computation: review                         # needs 4.3; parallel with 4.4+4.5
+  4-3-claim-verification-agent-verdict-engine: done                 # needs 4.1 + 3.x
+  4-4-quantitative-delta-calculation-and-verification-confidence-scoring: done # needs 4.3
+  4-5-structured-reasoning-trace-logger: done                       # needs 4.3; parallel with 4.4
+  4-6-ceo-delivery-score-computation: done                           # needs 4.3; parallel with 4.4+4.5
 
   epic-4-retrospective: optional
 

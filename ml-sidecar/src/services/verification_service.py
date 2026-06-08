@@ -73,7 +73,7 @@ def _build_verification_prompt(
     metrics_lines = "\n".join(
         f"  - {m.metric_name}: {m.value} {m.unit} (source: {m.section_reference}, status: {m.parse_status})"
         for m in metrics
-        if m.parse_status in ("SUCCESS", "PARTIAL")
+        if m.parse_status not in ("PARSE_FAILURE", "FETCH_ERROR")
     ) or "  (no metrics available)"
     return (
         f"Claim from earnings call:\n"
@@ -101,7 +101,10 @@ def _parse_full_verdict_response(content: str | None) -> tuple[str, str | None, 
     verdict = data.get("verdict", "")
     if verdict not in {"DELIVERED", "MISSED", "INSUFFICIENT_DATA"}:
         verdict = "INSUFFICIENT_DATA"
-    return verdict, data.get("matched_metric"), data.get("reasoning", "")
+    matched_metric = data.get("matched_metric")
+    if not isinstance(matched_metric, str):
+        matched_metric = None
+    return verdict, matched_metric, data.get("reasoning", "")
 
 
 def _parse_numeric_value(value_str: str, unit_str: str | None) -> tuple[float, str] | None:
@@ -115,19 +118,20 @@ def _parse_numeric_value(value_str: str, unit_str: str | None) -> tuple[float, s
       otherwise        → tag "raw"
     """
     try:
+        has_percent_in_value = "%" in value_str
         cleaned = value_str.strip().replace(",", "").replace("$", "").replace("%", "")
         num = float(cleaned)
     except (ValueError, TypeError, AttributeError):
         return None
 
     unit = (unit_str or "").lower()
-    if "billion" in unit or (unit.endswith("b") and len(unit) <= 3):
+    if "billion" in unit or unit in {"b", "bn", "bil"}:
         return (num * 1_000_000_000.0, "currency")
-    if "million" in unit or (unit in {"m", "mm", "usd m", "$ m"}):
+    if "million" in unit or unit in {"m", "mm", "usd m", "$ m"}:
         return (num * 1_000_000.0, "currency")
-    if "trillion" in unit or (unit.endswith("t") and len(unit) <= 3):
+    if "trillion" in unit or unit in {"t", "tn", "tril"}:
         return (num * 1_000_000_000_000.0, "currency")
-    if "%" in (unit_str or "") or "percent" in unit:
+    if "%" in (unit_str or "") or "percent" in unit or has_percent_in_value:
         return (num, "percent")
     return (num, "raw")
 
@@ -156,9 +160,9 @@ def _compute_delta(
     target_num, target_tag = parsed_target
     actual_num, actual_tag = parsed_actual
 
-    # Incompatible unit families (e.g. percent vs currency/raw)
-    meaningful = {"currency", "percent"}
-    if target_tag in meaningful and actual_tag in meaningful and target_tag != actual_tag:
+    # Incompatible unit families: percent vs non-percent is always a conflict;
+    # currency vs raw is allowed ("USD" without a scale word is still an absolute amount)
+    if (target_tag == "percent") != (actual_tag == "percent"):
         return None, True  # Unit conflict
 
     delta = actual_num - target_num
@@ -183,8 +187,8 @@ def _compute_confidence(
     if matched_metric is None:
         return Decimal("0.30")
 
-    m_lower = matched_metric.lower()
-    c_lower = claim_metric.lower()
+    m_lower = matched_metric.strip().lower()
+    c_lower = claim_metric.strip().lower()
     is_direct_match = c_lower in m_lower or m_lower in c_lower
 
     if is_direct_match:
@@ -209,6 +213,7 @@ async def _insufficient_data(
     verdict_id = await insert_verdict(
         claim_id=claim_id,
         verdict_type="INSUFFICIENT_DATA",
+        delta=None,
         confidence_score=confidence_score,
     )
     if traces:
@@ -263,6 +268,7 @@ async def verify_claim(
             "filing_type": decision.filing_type,
             "status": decision.status,
             "alignment_confidence": decision.alignment_confidence,
+            "reason": decision.mapping_rationale,
         },
         "result_summary": (
             f"Aligned {claim_quarter} → {decision.actuals_quarter} "
@@ -289,11 +295,11 @@ async def verify_claim(
         return await _insufficient_data(
             claim_id=claim_id,
             reason=f"Alignment failed: {decision.mapping_rationale}",
-            actuals_quarter=decision.actuals_quarter,
+            actuals_quarter=decision.actuals_quarter or claim_quarter,
             traces=_traces,
         )
 
-    actuals_quarter = decision.actuals_quarter
+    actuals_quarter = decision.actuals_quarter or claim_quarter
 
     # ── Step 2: Fetch financial actuals ──────────────────────────────────────
     financials = await ingest_financial_actuals(ticker, actuals_quarter)
@@ -305,6 +311,7 @@ async def verify_claim(
             "filing_type": financials.filing_type,
             "status": financials.status,
             "metrics_count": len(financials.metrics),
+            "reason": financials.status,
         },
         "result_summary": (
             f"Fetched {financials.filing_type} for {actuals_quarter}: "
@@ -333,6 +340,40 @@ async def verify_claim(
             traces=_traces,
         )
 
+    # Short-circuit when no usable metrics exist (e.g. PARTIAL filing with all metrics unparseable)
+    usable_metrics = [m for m in financials.metrics if m.parse_status not in ("PARSE_FAILURE", "FETCH_ERROR")]
+    if not usable_metrics:
+        logger.warning(
+            "No usable metrics available — producing INSUFFICIENT_DATA",
+            extra={
+                "ticker": ticker,
+                "actuals_quarter": actuals_quarter,
+                "filing_status": financials.status,
+                "jobId": job_id,
+            },
+        )
+        _traces.append({
+            "tool_call": {
+                "action": "no_usable_metrics",
+                "ticker": ticker,
+                "actuals_quarter": actuals_quarter,
+                "filing_status": financials.status,
+                "total_metrics": len(financials.metrics),
+                "reason": f"All {len(financials.metrics)} metric(s) have unparseable status in {financials.status} filing",
+            },
+            "result_summary": (
+                f"No usable metrics in {financials.status} filing for {actuals_quarter}: "
+                f"{len(financials.metrics)} metric(s) all failed parsing — upgrading to INSUFFICIENT_DATA"
+            ),
+            "edgar_filing_ref": None,
+        })
+        return await _insufficient_data(
+            claim_id=claim_id,
+            reason=f"No usable metrics in {financials.status} filing for {actuals_quarter}",
+            actuals_quarter=actuals_quarter,
+            traces=_traces,
+        )
+
     # ── Step 3: LLM verdict ──────────────────────────────────────────────────
     user_message = _build_verification_prompt(
         claim_metric=claim_metric,
@@ -351,7 +392,19 @@ async def verify_claim(
         {"role": "user", "content": user_message},
     ]
 
-    response: LLMResponse = await provider.complete(messages=messages)
+    try:
+        response: LLMResponse = await provider.complete(messages=messages)
+    except Exception as exc:
+        logger.warning(
+            "LLM call failed — producing INSUFFICIENT_DATA",
+            extra={"ticker": ticker, "actuals_quarter": actuals_quarter, "jobId": job_id, "error": str(exc)},
+        )
+        return await _insufficient_data(
+            claim_id=claim_id,
+            reason=f"LLM call failed: {exc}",
+            actuals_quarter=actuals_quarter,
+            traces=_traces,
+        )
 
     # NFR18: emit cost log after every LLM call
     logger.info(
@@ -512,7 +565,7 @@ async def verify_claim(
         verdict_type=verdict_type,
         actual_value=actual_value,
         actuals_quarter=actuals_quarter,
-        mapping_rationale=decision.mapping_rationale,
+        mapping_rationale=_reasoning or decision.mapping_rationale,
         delta=delta,
         confidence_score=float(confidence_score),
     )

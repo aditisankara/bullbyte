@@ -15,6 +15,7 @@ async def compute_ceo_delivery_score(ticker: str) -> CeoDeliveryScore:
     Reads directly from the append-only verdicts table — no separate score cache.
     Returns score=None when no resolved (DELIVERED or MISSED) verdicts exist.
     """
+    ticker = ticker.upper()
     rows = await get_verdicts_for_ticker(ticker)
 
     counts: dict[str, int] = {}

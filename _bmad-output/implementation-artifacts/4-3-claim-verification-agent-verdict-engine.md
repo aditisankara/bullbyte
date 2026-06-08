@@ -1,6 +1,6 @@
 # Story 4.3: Claim Verification Agent — Verdict Engine
 
-Status: review
+Status: done
 
 ## Story
 
@@ -541,3 +541,22 @@ claude-sonnet-4-6 (story creation via bmad-create-story, 2026-06-06)
 - `ml-sidecar/src/routers/analysis_router.py` (modified)
 - `_bmad-output/implementation-artifacts/4-3-claim-verification-agent-verdict-engine.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+### Review Findings
+
+<!-- Code review conducted 2026-06-07 -->
+
+- [x] [Review][Decision] `mapping_rationale` in VerificationResult stores temporal alignment rationale, not LLM verdict reasoning — resolved: use `_reasoning or decision.mapping_rationale` so LLM verdict explanation is stored when available [`ml-sidecar/src/services/verification_service.py`]
+- [x] [Review][Decision] AC5 timestamp field contradiction — resolved: follow dev notes; formatter adds timestamp automatically, no explicit key needed [`ml-sidecar/src/services/verification_service.py`]
+
+- [x] [Review][Patch] `verify_claim` "never raises" contract broken — fixed: wrapped `provider.complete()` in try/except → INSUFFICIENT_DATA on LLM failure [`ml-sidecar/src/services/verification_service.py`]
+- [x] [Review][Patch] `actual_value` extraction uses fuzzy substring match — fixed: code already prioritises LLM's `matched_metric_name` with fuzzy fallback (4.4 evolution); `mapping_rationale` updated to use LLM reasoning [`ml-sidecar/src/services/verification_service.py`]
+- [x] [Review][Patch] Metric filter uses non-existent `parse_status == "PARTIAL"` — fixed: changed to `not in ("PARSE_FAILURE", "FETCH_ERROR")` to correctly include AMBIGUOUS metrics [`ml-sidecar/src/services/verification_service.py`]
+- [x] [Review][Patch] `financials.status == "PARTIAL"` with empty metrics passes through to LLM — fixed: added usable_metrics guard that short-circuits to INSUFFICIENT_DATA when no parseable metrics exist [`ml-sidecar/src/services/verification_service.py`]
+- [x] [Review][Patch] `actuals_quarter` can be `""` on alignment failure — fixed: `decision.actuals_quarter or claim_quarter` fallback applied at both early-exit and main-path assignment [`ml-sidecar/src/services/verification_service.py`]
+- [x] [Review][Patch] `test_insufficient_data_on_filing_not_yet_available` redundant nested patches — fixed: rewritten using flat parenthesised `with` block; `mock_prov.complete.assert_not_called()` now checks the wired mock [`ml-sidecar/tests/test_verification.py`]
+
+- [x] [Review][Defer] `zip(claim_ids, result.claims)` silently truncates with no assertion — not triggered by current code (both lists built from same `result.claims`) but no defensive guard; a future deduplication step could silently skip tail claims [`ml-sidecar/src/routers/analysis_router.py`] — deferred, pre-existing
+- [x] [Review][Defer] `messages` array passes `{"role": "system", ...}` inside messages list — Anthropic API requires system prompt as top-level param, not a role; correctness depends on `provider.complete()` implementation not visible in this diff [`ml-sidecar/src/services/verification_service.py`] — deferred, pre-existing
+- [x] [Review][Defer] `get_provider()` called inside per-claim loop — can raise `ValueError` on env misconfiguration; should be resolved once before the loop to avoid redundant calls [`ml-sidecar/src/services/verification_service.py`] — deferred, pre-existing
+- [x] [Review][Defer] `AMBIGUOUS` alignment status would bypass the `filing_url`-based guard if returned with a non-empty URL — not currently produced by the aligner; guard should check `decision.status != "ALIGNED"` rather than relying on empty `filing_url` as proxy [`ml-sidecar/src/services/verification_service.py`] — deferred, pre-existing
