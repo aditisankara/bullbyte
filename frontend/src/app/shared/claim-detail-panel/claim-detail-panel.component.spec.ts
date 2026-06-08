@@ -25,11 +25,17 @@ describe('ClaimDetailPanelComponent', () => {
     }).compileComponents();
   });
 
-  function render(claim: ClaimDetail | null = DETAIL, shareUrl?: string) {
+  function render(
+    claim: ClaimDetail | null = DETAIL,
+    inputs: { shareUrl?: string; showComparison?: boolean } = {},
+  ) {
     const fixture = TestBed.createComponent(ClaimDetailPanelComponent);
     fixture.componentRef.setInput('claim', claim);
-    if (shareUrl !== undefined) {
-      fixture.componentRef.setInput('shareUrl', shareUrl);
+    if (inputs.shareUrl !== undefined) {
+      fixture.componentRef.setInput('shareUrl', inputs.shareUrl);
+    }
+    if (inputs.showComparison !== undefined) {
+      fixture.componentRef.setInput('showComparison', inputs.showComparison);
     }
     fixture.detectChanges();
     return fixture;
@@ -82,5 +88,33 @@ describe('ClaimDetailPanelComponent', () => {
     expect(el.querySelector('app-confidence-indicator .conf--low')).not.toBeNull();
     // confidence still shown, not suppressed
     expect(el.querySelector('app-confidence-indicator .conf__value')?.textContent?.trim()).toBe('0.42');
+  });
+
+  // ── 6.5 opt-ins: degrade gracefully when the 5.5 API under-serves the panel ──
+
+  it('hides the claimed→actual comparison when showComparison is false, keeping confidence', () => {
+    const el = render(DETAIL, { showComparison: false }).nativeElement as HTMLElement;
+    expect(el.querySelector('.panel__compare')).toBeNull();
+    expect(el.textContent).not.toContain('What actually happened');
+    // confidence indicator is retained (AC1 / AC3)
+    expect(el.querySelector('app-confidence-indicator [role="meter"]')).not.toBeNull();
+  });
+
+  it('uses a generic filing label when the source has no type', () => {
+    const el = render({
+      ...DETAIL,
+      filing: { type: '', quarter: 'Q1 2024', url: 'https://www.sec.gov/edgar/x' },
+    }).nativeElement as HTMLElement;
+    const link = el.querySelector('.panel__source a.panel__filing') as HTMLAnchorElement;
+    expect(link.textContent).toContain('EDGAR filing');
+    expect(link.textContent).toContain('Q1 2024');
+  });
+
+  it('renders no source link when the filing url is absent', () => {
+    const el = render({
+      ...DETAIL,
+      filing: { type: '', quarter: 'Q1 2024', url: '' },
+    }).nativeElement as HTMLElement;
+    expect(el.querySelector('.panel__source')).toBeNull();
   });
 });

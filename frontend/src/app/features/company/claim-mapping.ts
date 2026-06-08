@@ -1,5 +1,14 @@
-import { ClaimListItem } from '../../core/api/claim.models';
-import { ClaimSummary, QuarterColumn } from '../../shared/claim/claim';
+import {
+  ClaimDetailApi,
+  ClaimListItem,
+  ReasoningTraceStepApi,
+} from '../../core/api/claim.models';
+import {
+  ClaimDetail,
+  ClaimSummary,
+  QuarterColumn,
+  TraceStep,
+} from '../../shared/claim/claim';
 import { Verdict } from '../../shared/verdict/verdict';
 
 /**
@@ -83,6 +92,58 @@ export function toClaimSummaries(items: ClaimListItem[]): ClaimSummary[] {
   return [...items]
     .sort((a, b) => quarterOrdinal(a.quarter) - quarterOrdinal(b.quarter))
     .map(toClaimSummary);
+}
+
+/** Compose the claimed target with its unit, e.g. "620M users" (or just the value). */
+function claimedValue(item: ClaimListItem): string {
+  return item.targetUnit ? `${item.targetValue} ${item.targetUnit}` : item.targetValue;
+}
+
+/**
+ * Best-effort tool name from the opaque jsonb `toolCall`. The real per-step
+ * parsing (args + structured citations) is Story 6.6; here we just surface a
+ * readable label for the collapsed trace.
+ */
+function toolLabel(toolCall: unknown): string {
+  if (toolCall && typeof toolCall === 'object') {
+    const o = toolCall as Record<string, unknown>;
+    for (const key of ['tool', 'name', 'function'] as const) {
+      const v = o[key];
+      if (typeof v === 'string' && v) return v;
+    }
+  }
+  return 'tool call';
+}
+
+/** Map one API trace step to a presentation step (basic; 6.6 deepens citations). */
+function toTraceStep(step: ReasoningTraceStepApi): TraceStep {
+  return {
+    tool: toolLabel(step.toolCall),
+    args: '',
+    result: step.resultSummary ?? '',
+    citation: step.edgarFilingRef
+      ? { label: 'EDGAR filing', url: step.edgarFilingRef }
+      : undefined,
+  };
+}
+
+/**
+ * Map the 5.5 claim-detail DTO to the 2.5 `ClaimDetailPanel` model. Five fields
+ * the panel was designed for are not returned by 5.5 — `actual`, `actualFiling`,
+ * and the source filing `type` — so they degrade: the smart panel hides the
+ * claimed→actual comparison (`showComparison=false`) and the header delta
+ * carries the quantitative outcome instead (FR37). `edgarSourceUrl: null`
+ * yields an empty `filing.url`, which the panel renders as no source link.
+ */
+export function toClaimDetail(detail: ClaimDetailApi): ClaimDetail {
+  return {
+    ...toClaimSummary(detail),
+    claimed: claimedValue(detail),
+    actual: '', // 5.5 returns no actual value — comparison is hidden
+    filing: { type: '', quarter: displayQuarter(detail.quarter), url: detail.edgarSourceUrl ?? '' },
+    actualFiling: { type: '', quarter: '', url: '' }, // not returned by 5.5
+    trace: detail.reasoningTrace.map(toTraceStep),
+  };
 }
 
 /** The timeline columns plus their canonical quarter keys (parallel arrays). */

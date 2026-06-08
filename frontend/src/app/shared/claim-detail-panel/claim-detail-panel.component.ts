@@ -48,38 +48,45 @@ import { ReasoningTraceComponent } from '../reasoning-trace/reasoning-trace.comp
           <h6 class="panel__label">The claim</h6>
           <blockquote class="panel__quote">{{ c.quote }}</blockquote>
           <p class="panel__attribution">— {{ c.speaker }}</p>
-          <p class="panel__source">
-            Source:
-            <a class="panel__filing" [href]="c.filing.url" target="_blank" rel="noopener noreferrer">
-              {{ c.filing.type }} · {{ c.filing.quarter }}
-              <svg class="panel__ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M21 14v7H3V3h7" />
-              </svg>
-              <span class="visually-hidden">(opens in a new tab)</span>
-            </a>
-          </p>
+          @if (c.filing.url) {
+            <p class="panel__source">
+              Source:
+              <a class="panel__filing" [href]="c.filing.url" target="_blank" rel="noopener noreferrer">
+                {{ c.filing.type || 'EDGAR filing' }} · {{ c.filing.quarter }}
+                <svg class="panel__ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M21 14v7H3V3h7" />
+                </svg>
+                <span class="visually-hidden">(opens in a new tab)</span>
+              </a>
+            </p>
+          }
         </section>
 
         <section class="panel__section">
-          <h6 class="panel__label">What actually happened</h6>
-          <div class="panel__compare">
-            <span class="panel__col">
-              <span class="panel__col-label">Claimed</span>
-              <span class="panel__value mono">{{ c.claimed }}</span>
-            </span>
-            <span class="panel__arrow" aria-hidden="true">→</span>
-            <span class="panel__col">
-              <span class="panel__col-label">Actual</span>
-              <span class="panel__value mono">{{ c.actual }}</span>
-            </span>
-            <a class="panel__filing panel__filing--actual" [href]="c.actualFiling.url" target="_blank" rel="noopener noreferrer">
-              {{ c.actualFiling.type }} · {{ c.actualFiling.quarter }}
-              <svg class="panel__ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M21 14v7H3V3h7" />
-              </svg>
-              <span class="visually-hidden">(opens in a new tab)</span>
-            </a>
-          </div>
+          <!-- 6.5: the 5.5 API returns no "actual" value, so the smart panel
+               sets showComparison=false and the header delta carries the
+               outcome; the confidence + low-confidence note always show. -->
+          @if (showComparison()) {
+            <h6 class="panel__label">What actually happened</h6>
+            <div class="panel__compare">
+              <span class="panel__col">
+                <span class="panel__col-label">Claimed</span>
+                <span class="panel__value mono">{{ c.claimed }}</span>
+              </span>
+              <span class="panel__arrow" aria-hidden="true">→</span>
+              <span class="panel__col">
+                <span class="panel__col-label">Actual</span>
+                <span class="panel__value mono">{{ c.actual }}</span>
+              </span>
+              <a class="panel__filing panel__filing--actual" [href]="c.actualFiling.url" target="_blank" rel="noopener noreferrer">
+                {{ c.actualFiling.type }} · {{ c.actualFiling.quarter }}
+                <svg class="panel__ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M21 14v7H3V3h7" />
+                </svg>
+                <span class="visually-hidden">(opens in a new tab)</span>
+              </a>
+            </div>
+          }
           <div class="panel__confidence">
             <app-confidence-indicator [score]="c.confidence" />
             @if (lowConfidence()) {
@@ -261,6 +268,12 @@ export class ClaimDetailPanelComponent {
   readonly claim = input<ClaimDetail | null>(null);
   /** Stable deep link for this claim (FR41); copied to the clipboard on Share. */
   readonly shareUrl = input<string>();
+  /**
+   * Show the claimed→actual comparison block. Off when the data source carries
+   * no "actual" value (6.5 / 5.5) — the header delta carries the outcome and the
+   * confidence indicator still renders. Default on to preserve 2.5 behaviour.
+   */
+  readonly showComparison = input<boolean>(true);
 
   /** Emits the claim id when the user shares it. */
   readonly share = output<string>();

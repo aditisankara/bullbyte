@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AnalyzeResponse, CeoScoreDto, CompanySummary } from './company.models';
-import { ClaimListResponse } from './claim.models';
+import { ClaimDetailApi, ClaimListResponse } from './claim.models';
 
 /**
  * Typed client for the company endpoints (5.1 + 5.4). Raw error bodies never
@@ -40,6 +40,14 @@ export class CompanyApiService {
   getScore(ticker: string): Observable<CeoScoreDto> {
     return this.http.get<CeoScoreDto>(
       `${this.base}/${encodeURIComponent(ticker)}/score`,
+    );
+  }
+
+  /** Full detail for one claim incl. the reasoning trace (FR36–FR39, Story 5.5).
+   *  Note: served at `/claims/:id`, not under `/companies`. */
+  getClaimDetail(claimId: string): Observable<ClaimDetailApi> {
+    return this.http.get<ClaimDetailApi>(
+      `${environment.apiBaseUrl}/claims/${encodeURIComponent(claimId)}`,
     );
   }
 }

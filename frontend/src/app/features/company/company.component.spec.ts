@@ -9,7 +9,11 @@ import { provideRouter, Router } from '@angular/router';
 import { CompanyComponent } from './company.component';
 import { httpErrorInterceptor } from '../../core/interceptors/http-error.interceptor';
 import { CompanySummary } from '../../core/api/company.models';
-import { ClaimListItem, ClaimListResponse } from '../../core/api/claim.models';
+import {
+  ClaimDetailApi,
+  ClaimListItem,
+  ClaimListResponse,
+} from '../../core/api/claim.models';
 import {
   FakeEventSource,
   progressEvent,
@@ -112,6 +116,22 @@ describe('CompanyComponent', () => {
       .flush({ ...NO_SCORE, ticker });
   }
 
+  function claimDetail(id = 'cl-1'): ClaimDetailApi {
+    return {
+      ...claim({ id, quarter: 'Q1-2024' }),
+      edgarSourceUrl: 'https://www.sec.gov/edgar/x',
+      lowConfidence: false,
+      reasoningTrace: [],
+    };
+  }
+
+  /** Flush the detail request the 6.5 panel fires once a claim is selected. */
+  function flushClaimDetail(id = 'cl-1') {
+    http
+      .expectOne(`${environment.apiBaseUrl}/claims/${id}`)
+      .flush(claimDetail(id));
+  }
+
   it('fetches the summary on load with no prior search (AC4)', () => {
     const fixture = render();
     const req = http.expectOne(`${environment.apiBaseUrl}/companies/TSLA`);
@@ -132,7 +152,7 @@ describe('CompanyComponent', () => {
     flushClaims();
   });
 
-  it('renders one h1 and the four layout section headings (AC5)', () => {
+  it('renders one h1 and the live section headings (AC5)', () => {
     const fixture = render();
     http.expectOne(`${environment.apiBaseUrl}/companies/TSLA`).flush(SUMMARY);
     fixture.detectChanges();
@@ -143,8 +163,8 @@ describe('CompanyComponent', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelectorAll('h1').length).toBe(1);
     expect(el.querySelector('app-company-page-layout')).not.toBeNull();
-    // The score slot now hosts the live 6.4 card (its own h2); the other three
-    // slots keep their pending placeholders until 6.3/6.5/6.6 wire them.
+    // Score (6.4), timeline (6.3) and claims (6.3) carry headings; the detail
+    // slot (6.5) shows its empty panel — no standing heading until a claim opens.
     const headings = Array.from(el.querySelectorAll('h2')).map(
       (h) => h.textContent?.trim(),
     );
@@ -152,7 +172,6 @@ describe('CompanyComponent', () => {
       'CEO Delivery Score',
       'Promise timeline',
       'Claims',
-      'Claim detail',
     ]);
   });
 
@@ -325,7 +344,10 @@ describe('CompanyComponent', () => {
     expect(cards[0].textContent).toContain('Q2 2024');
   });
 
-  it('marks the activated claim card as selected (AC4 selection contract)', () => {
+  // ── 6.5: claim detail panel ───────────────────────────────────────────────
+
+  /** Render a completed dashboard with two Q1-2024 claims, ready to select. */
+  function renderDashboardWithClaims() {
     const fixture = render();
     http.expectOne(`${environment.apiBaseUrl}/companies/TSLA`).flush(SUMMARY);
     fixture.detectChanges();
@@ -335,13 +357,94 @@ describe('CompanyComponent', () => {
     ]);
     flushScore();
     fixture.detectChanges();
+    return fixture;
+  }
 
+  it('opens the detail by writing ?claim= and marks the card selected (AC4)', () => {
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    const fixture = renderDashboardWithClaims();
     const el = fixture.nativeElement as HTMLElement;
+
     const buttons = el.querySelectorAll('app-claim-card .card__action');
     (buttons[0] as HTMLButtonElement).click();
+    expect(navigate).toHaveBeenCalledWith(['/company', 'TSLA'], {
+      queryParams: { claim: 'cl-1' },
+      queryParamsHandling: 'merge',
+    });
+
+    // The URL round-trips into the bound input → card highlights + detail fetches.
+    fixture.componentRef.setInput('claim', 'cl-1');
+    fixture.detectChanges();
+    flushClaimDetail('cl-1');
     fixture.detectChanges();
 
-    const selected = el.querySelectorAll('app-claim-card .card--selected');
-    expect(selected.length).toBe(1);
+    expect(el.querySelectorAll('app-claim-card .card--selected').length).toBe(1);
+    expect(
+      el.querySelector('app-claim-detail app-claim-detail-panel article.panel'),
+    ).not.toBeNull();
+    // delta is shown; the claimed→actual comparison is hidden (5.5 has no actual).
+    expect(el.querySelector('app-claim-detail .panel__compare')).toBeNull();
+  });
+
+  it('renders the detail directly from a ?claim= deep link (AC4)', () => {
+    const fixture = renderDashboardWithClaims();
+    fixture.componentRef.setInput('claim', 'cl-2');
+    fixture.detectChanges();
+    flushClaimDetail('cl-2');
+    fixture.detectChanges();
+
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector(
+        'app-claim-detail app-claim-detail-panel article.panel',
+      ),
+    ).not.toBeNull();
+  });
+
+  it('does not fetch a claim detail when none is selected', () => {
+    renderDashboardWithClaims();
+    // afterEach http.verify() asserts no stray /claims/:id request fired.
+    http.expectNone(`${environment.apiBaseUrl}/claims/cl-1`);
+  });
+
+  it('clears ?claim= and returns focus to the card on close (AC5)', () => {
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    const fixture = renderDashboardWithClaims();
+    const el = fixture.nativeElement as HTMLElement;
+
+    // Open via a card click (captures the trigger element for focus return)…
+    (el.querySelectorAll('app-claim-card .card__action')[0] as HTMLButtonElement).click();
+    fixture.componentRef.setInput('claim', 'cl-1');
+    fixture.detectChanges();
+    flushClaimDetail('cl-1');
+    fixture.detectChanges();
+
+    navigate.mockClear();
+    (el.querySelector('app-claim-detail .claim-detail__close') as HTMLButtonElement).click();
+    expect(navigate).toHaveBeenCalledWith(['/company', 'TSLA'], {
+      queryParams: { claim: null },
+      queryParamsHandling: 'merge',
+    });
+  });
+
+  it('closes the detail on the Escape key (AC5)', () => {
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    const fixture = renderDashboardWithClaims();
+    fixture.componentRef.setInput('claim', 'cl-1');
+    fixture.detectChanges();
+    flushClaimDetail('cl-1');
+    fixture.detectChanges();
+
+    navigate.mockClear();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(navigate).toHaveBeenCalledWith(['/company', 'TSLA'], {
+      queryParams: { claim: null },
+      queryParamsHandling: 'merge',
+    });
   });
 });
