@@ -5,6 +5,8 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { CompanyApiService } from './company-api.service';
+import { AnalyzeResponse, CompanySummary } from './company.models';
+import { ClaimListResponse } from './claim.models';
 import { AnalyzeResponse, CeoScoreDto, CompanySummary } from './company.models';
 import { environment } from '../../../environments/environment';
 
@@ -54,43 +56,18 @@ describe('CompanyApiService', () => {
     expect(response).toEqual(summary);
   });
 
-  it('GETs /companies/:ticker/score and returns the CEO score', () => {
-    const score: CeoScoreDto = {
-      ticker: 'TSLA',
-      score: 0.6,
-      deliveredCount: 3,
-      missedCount: 2,
-      totalResolved: 5,
-      pendingCount: 4,
-      insufficientDataCount: 1,
-      context: '3 of 5 resolved promises delivered — 4 pending',
+  it('GETs /companies/:ticker/claims and returns the claims envelope', () => {
+    const payload: ClaimListResponse = {
+      data: [],
+      meta: { total: 0, page: 1, pageSize: 20 },
     };
-    let response: CeoScoreDto | undefined;
-    service.getScore('TSLA').subscribe((r) => (response = r));
+    let response: ClaimListResponse | undefined;
+    service.getClaims('TSLA').subscribe((r) => (response = r));
 
-    const req = http.expectOne(`${environment.apiBaseUrl}/companies/TSLA/score`);
+    const req = http.expectOne(`${environment.apiBaseUrl}/companies/TSLA/claims`);
     expect(req.request.method).toBe('GET');
-    req.flush(score);
+    req.flush(payload);
 
-    expect(response).toEqual(score);
-  });
-
-  it('passes through a null score for a ticker with no resolved claims', () => {
-    const score: CeoScoreDto = {
-      ticker: 'TSLA',
-      score: null,
-      deliveredCount: 0,
-      missedCount: 0,
-      totalResolved: 0,
-      pendingCount: 4,
-      insufficientDataCount: 0,
-      context: 'No resolved claims yet',
-    };
-    let response: CeoScoreDto | undefined;
-    service.getScore('TSLA').subscribe((r) => (response = r));
-
-    http.expectOne(`${environment.apiBaseUrl}/companies/TSLA/score`).flush(score);
-
-    expect(response?.score).toBeNull();
+    expect(response).toEqual(payload);
   });
 });

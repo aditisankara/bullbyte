@@ -2,6 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+dimport { AnalyzeResponse, CompanySummary } from './company.models';
+import { ClaimListResponse } from './claim.models';
 import { AnalyzeResponse, CeoScoreDto, CompanySummary } from './company.models';
 
 /**
@@ -28,6 +30,10 @@ export class CompanyApiService {
     );
   }
 
+  /** Claims timeline for a ticker — up to 8 quarters (FR31, Story 5.5). */
+  getClaims(ticker: string): Observable<ClaimListResponse> {
+    return this.http.get<ClaimListResponse>(
+      `${this.base}/${encodeURIComponent(ticker)}/claims`,
   /** CEO Delivery Score with sample-size context (FR22–FR24, 5.6). */
   getScore(ticker: string): Observable<CeoScoreDto> {
     return this.http.get<CeoScoreDto>(
