@@ -44,11 +44,14 @@ import { TraceStep } from '../claim/claim';
       @if (expanded()) {
         <ol id="reasoning-trace-steps" class="trace__steps">
           @for (step of steps(); track $index) {
-            <li class="trace__step">
+            <li class="trace__step" [class.trace__step--failure]="step.failure">
               <span class="trace__index mono" aria-hidden="true">{{ pad($index + 1) }}</span>
               <span class="trace__body mono">
                 <span class="trace__tool">{{ step.tool }}</span><span class="trace__args">({{ step.args }})</span>
                 <span class="trace__result"> → {{ step.result }}</span>
+                @if (step.failure) {
+                  <span class="trace__failure-tag">trace ended here</span>
+                }
                 @if (step.citation) {
                   <a
                     class="trace__cite"
@@ -127,6 +130,23 @@ import { TraceStep } from '../claim/claim';
       gap: var(--space-3);
       align-items: baseline;
       padding: 2px 0;
+    }
+    /* AC4: the INSUFFICIENT_DATA stop point — visually distinct from the rest. */
+    .trace__step--failure {
+      padding: var(--space-1) var(--space-2);
+      margin-top: 2px;
+      border-left: 2px solid var(--verdict-insufficient);
+      background: var(--paper);
+      border-radius: var(--radius-sm);
+    }
+    .trace__failure-tag {
+      margin-left: var(--space-2);
+      padding: 0 var(--space-1);
+      font-size: var(--text-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-allcaps);
+      color: var(--verdict-insufficient-ink);
     }
     .trace__index {
       flex-shrink: 0;

@@ -99,31 +99,68 @@ function claimedValue(item: ClaimListItem): string {
   return item.targetUnit ? `${item.targetValue} ${item.targetUnit}` : item.targetValue;
 }
 
-/**
- * Best-effort tool name from the opaque jsonb `toolCall`. The real per-step
- * parsing (args + structured citations) is Story 6.6; here we just surface a
- * readable label for the collapsed trace.
- */
-function toolLabel(toolCall: unknown): string {
-  if (toolCall && typeof toolCall === 'object') {
-    const o = toolCall as Record<string, unknown>;
-    for (const key of ['tool', 'name', 'function'] as const) {
-      const v = o[key];
-      if (typeof v === 'string' && v) return v;
-    }
-  }
-  return 'tool call';
+/** Curated labels for the known 4.5 verification actions; others humanise generically. */
+const ACTION_LABELS: Record<string, string> = {
+  temporal_alignment: 'Temporal alignment',
+  fetch_financial_actuals: 'Fetch financial actuals',
+  llm_verdict: 'LLM verdict',
+  unit_conflict: 'Unit conflict',
+  unit_normalization: 'Unit normalization',
+};
+
+/** `"fetch_financial_actuals"` → `"Fetch financial actuals"`. */
+function humaniseAction(action: string): string {
+  return (
+    ACTION_LABELS[action] ??
+    action.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
+  );
 }
 
-/** Map one API trace step to a presentation step (basic; 6.6 deepens citations). */
+/**
+ * Tool name + compact args from the structured `toolCall` jsonb (4.5 writes
+ * `{ action, ...scalarArgs }`). Non-scalar/`action` keys are dropped.
+ */
+function parseToolCall(toolCall: unknown): { tool: string; args: string } {
+  if (!toolCall || typeof toolCall !== 'object') {
+    return { tool: 'tool call', args: '' };
+  }
+  const entries = Object.entries(toolCall as Record<string, unknown>);
+  const action = entries.find(([k]) => k === 'action')?.[1];
+  const tool = typeof action === 'string' && action ? humaniseAction(action) : 'tool call';
+  const args = entries
+    .filter(
+      ([k, v]) =>
+        k !== 'action' &&
+        (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'),
+    )
+    .map(([k, v]) => `${k}=${v}`)
+    .join(', ');
+  return { tool, args };
+}
+
+/**
+ * Parse 4.5's pipe-delimited `edgarFilingRef` —
+ * `"{filingType} | {ticker} | {quarter} | {url}"` — into an inline citation
+ * showing filing type · ticker · quarter (FR39). Null/malformed/url-less →
+ * no citation (never a broken href).
+ */
+function parseCitation(ref: string | null): TraceStep['citation'] {
+  if (!ref) return undefined;
+  const parts = ref.split(' | ').map((p) => p.trim());
+  if (parts.length !== 4) return undefined;
+  const [type, ticker, quarter, url] = parts;
+  if (!url) return undefined;
+  return { label: `${type} · ${ticker} · ${displayQuarter(quarter)}`, url };
+}
+
+/** Map one API trace step to a presentation step (6.6: structured tool + citation). */
 function toTraceStep(step: ReasoningTraceStepApi): TraceStep {
+  const { tool, args } = parseToolCall(step.toolCall);
   return {
-    tool: toolLabel(step.toolCall),
-    args: '',
+    tool,
+    args,
     result: step.resultSummary ?? '',
-    citation: step.edgarFilingRef
-      ? { label: 'EDGAR filing', url: step.edgarFilingRef }
-      : undefined,
+    citation: parseCitation(step.edgarFilingRef),
   };
 }
 
@@ -136,13 +173,19 @@ function toTraceStep(step: ReasoningTraceStepApi): TraceStep {
  * yields an empty `filing.url`, which the panel renders as no source link.
  */
 export function toClaimDetail(detail: ClaimDetailApi): ClaimDetail {
+  const trace = detail.reasoningTrace.map(toTraceStep);
+  // AC4: the verifier accumulates each step and writes on failure, so the last
+  // step is the stop point — flag it when the verdict is INSUFFICIENT_DATA.
+  if (detail.verdict?.verdictType === 'INSUFFICIENT_DATA' && trace.length > 0) {
+    trace[trace.length - 1] = { ...trace[trace.length - 1], failure: true };
+  }
   return {
     ...toClaimSummary(detail),
     claimed: claimedValue(detail),
     actual: '', // 5.5 returns no actual value — comparison is hidden
     filing: { type: '', quarter: displayQuarter(detail.quarter), url: detail.edgarSourceUrl ?? '' },
     actualFiling: { type: '', quarter: '', url: '' }, // not returned by 5.5
-    trace: detail.reasoningTrace.map(toTraceStep),
+    trace,
   };
 }
 
