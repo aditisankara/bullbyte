@@ -268,6 +268,7 @@ async def verify_claim(
             "filing_type": decision.filing_type,
             "status": decision.status,
             "alignment_confidence": decision.alignment_confidence,
+            "reason": decision.mapping_rationale,
         },
         "result_summary": (
             f"Aligned {claim_quarter} → {decision.actuals_quarter} "
@@ -310,6 +311,7 @@ async def verify_claim(
             "filing_type": financials.filing_type,
             "status": financials.status,
             "metrics_count": len(financials.metrics),
+            "reason": financials.status,
         },
         "result_summary": (
             f"Fetched {financials.filing_type} for {actuals_quarter}: "
@@ -350,6 +352,21 @@ async def verify_claim(
                 "jobId": job_id,
             },
         )
+        _traces.append({
+            "tool_call": {
+                "action": "no_usable_metrics",
+                "ticker": ticker,
+                "actuals_quarter": actuals_quarter,
+                "filing_status": financials.status,
+                "total_metrics": len(financials.metrics),
+                "reason": f"All {len(financials.metrics)} metric(s) have unparseable status in {financials.status} filing",
+            },
+            "result_summary": (
+                f"No usable metrics in {financials.status} filing for {actuals_quarter}: "
+                f"{len(financials.metrics)} metric(s) all failed parsing — upgrading to INSUFFICIENT_DATA"
+            ),
+            "edgar_filing_ref": None,
+        })
         return await _insufficient_data(
             claim_id=claim_id,
             reason=f"No usable metrics in {financials.status} filing for {actuals_quarter}",

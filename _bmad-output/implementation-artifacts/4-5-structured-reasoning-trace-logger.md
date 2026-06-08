@@ -1,6 +1,6 @@
 # Story 4.5: Structured Reasoning Trace Logger
 
-Status: review
+Status: done
 
 ## Story
 
@@ -729,6 +729,13 @@ claude-sonnet-4-6 (story creation via bmad-create-story, 2026-06-07)
 - ml-sidecar/tests/test_verification.py
 - ml-sidecar/tests/test_delta_scoring.py
 - ml-sidecar/tests/test_reasoning_trace.py (NEW)
+
+## Review Findings
+
+- [x] [Review][Patch] No trace step for "no usable metrics" early-exit path — AC3/AC5 violation [`ml-sidecar/src/services/verification_service.py:343`]
+- [x] [Review][Patch] Missing `"reason"` field in alignment and financials failure tool_call dicts — AC4 violation [`ml-sidecar/src/services/verification_service.py:262,305`]
+- [x] [Review][Defer] `_make_filing_ref` could produce malformed ref string when `filing_type` or `quarter` is None while `url` is present [`ml-sidecar/src/services/verification_service.py:196`] — deferred, pre-existing edge case with no known trigger path
+- [x] [Review][Defer] Trace write exceptions propagate past `insert_verdict` in Step 8 flush loop, contradicting dev notes architecture guardrail ("DB write failure is logged, not propagated to caller") [`ml-sidecar/src/services/verification_service.py:496`] — deferred, pre-existing design gap
 
 ## Change Log
 

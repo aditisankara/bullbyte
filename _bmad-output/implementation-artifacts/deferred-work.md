@@ -1,5 +1,10 @@
 # Deferred Work
 
+## Deferred from: code review of 4-5-structured-reasoning-trace-logger (2026-06-08)
+
+- `_make_filing_ref` could produce a malformed ref string (e.g. `"None | AAPL | None | https://..."`) if `filing_type` or `quarter` is `None` while `url` is non-empty — no known trigger path today, but the helper has no type guard on those fields [`ml-sidecar/src/services/verification_service.py:196`]
+- Trace write exceptions propagate past `insert_verdict` in the Step 8 flush loop, contradicting the stated architecture guardrail ("DB write failure is logged, not propagated to caller") — verdict row exists in DB but caller gets an exception and may retry creating a duplicate verdict; wrap trace writes in try/except with a warning log [`ml-sidecar/src/services/verification_service.py:496`]
+
 ## Deferred from: code review of 4-4-quantitative-delta-calculation-and-verification-confidence-scoring (2026-06-08)
 
 - Float arithmetic for financial delta — `_parse_numeric_value` returns `float` and delta arithmetic is IEEE-754; Decimal would eliminate precision loss on large currency values (e.g. $383,000,000,000 ± cents); address in a future numeric-precision story [`ml-sidecar/src/services/verification_service.py`]
