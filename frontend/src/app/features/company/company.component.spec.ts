@@ -105,6 +105,13 @@ describe('CompanyComponent', () => {
       .flush(claimsPayload(data));
   }
 
+  /** Flush the score request the 6.4 score card fires once the dashboard renders. */
+  function flushScore(ticker = 'TSLA') {
+    http
+      .expectOne(`${environment.apiBaseUrl}/companies/${ticker}/score`)
+      .flush({ ...NO_SCORE, ticker });
+  }
+
   it('fetches the summary on load with no prior search (AC4)', () => {
     const fixture = render();
     const req = http.expectOne(`${environment.apiBaseUrl}/companies/TSLA`);
@@ -112,6 +119,7 @@ describe('CompanyComponent', () => {
     req.flush(SUMMARY);
     fixture.detectChanges();
     flushClaims();
+    flushScore();
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('h1')?.textContent).toContain('Tesla, Inc.');
@@ -129,6 +137,7 @@ describe('CompanyComponent', () => {
     http.expectOne(`${environment.apiBaseUrl}/companies/TSLA`).flush(SUMMARY);
     fixture.detectChanges();
     flushClaims();
+    flushScore();
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -189,6 +198,7 @@ describe('CompanyComponent', () => {
       .flush({ ...SUMMARY, latestJobId: 'job-9' });
     fixture.detectChanges();
     flushClaims();
+    flushScore();
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -201,6 +211,7 @@ describe('CompanyComponent', () => {
     http.expectOne(`${environment.apiBaseUrl}/companies/TSLA`).flush(SUMMARY);
     fixture.detectChanges();
     flushClaims();
+    flushScore();
 
     fixture.componentRef.setInput('ticker', 'NVDA');
     fixture.detectChanges();
@@ -209,6 +220,7 @@ describe('CompanyComponent', () => {
       .flush({ ...SUMMARY, id: 'c-2', ticker: 'NVDA', name: 'NVIDIA Corp.' });
     fixture.detectChanges();
     flushClaims([], 'NVDA');
+    flushScore('NVDA');
     fixture.detectChanges();
 
     expect(
@@ -226,6 +238,7 @@ describe('CompanyComponent', () => {
       claim({ id: 'q4', quarter: 'Q4-2024' }),
       claim({ id: 'q1', quarter: 'Q1-2024' }),
     ]);
+    flushScore();
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -242,6 +255,7 @@ describe('CompanyComponent', () => {
     http.expectOne(`${environment.apiBaseUrl}/companies/TSLA`).flush(SUMMARY);
     fixture.detectChanges();
     flushClaims([]);
+    flushScore();
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -260,6 +274,7 @@ describe('CompanyComponent', () => {
         { statusCode: 503, error: 'UNAVAILABLE', code: 'EDGAR_UNAVAILABLE' },
         { status: 503, statusText: 'Service Unavailable' },
       );
+    flushScore();
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -290,6 +305,7 @@ describe('CompanyComponent', () => {
       claim({ id: 'q1', quarter: 'Q1-2024' }),
       claim({ id: 'q2', quarter: 'Q2-2024' }),
     ]);
+    flushScore();
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -317,6 +333,7 @@ describe('CompanyComponent', () => {
       claim({ id: 'cl-1', quarter: 'Q1-2024' }),
       claim({ id: 'cl-2', quarter: 'Q1-2024', metric: 'ARPU guidance' }),
     ]);
+    flushScore();
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;

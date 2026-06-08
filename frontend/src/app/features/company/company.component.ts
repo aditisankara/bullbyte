@@ -22,6 +22,7 @@ import {
 import { PromiseTimelineComponent } from '../../shared/promise-timeline/promise-timeline.component';
 import { ClaimCardComponent } from '../../shared/claim-card/claim-card.component';
 import { AnalysisProgressComponent } from './analysis-progress.component';
+import { ScoreCardComponent } from './score-card.component';
 import {
   buildTimeline,
   normaliseQuarterKey,
