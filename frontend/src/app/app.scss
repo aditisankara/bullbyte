@@ -7,3 +7,27 @@
 main {
   flex: 1;
 }
+
+/* Keyboard skip-link (NFR21, UX-DR7): off-screen until focused, then visible. */
+.skip-link {
+  position: absolute;
+  left: var(--space-3, 12px);
+  top: -100%;
+  z-index: 10;
+  padding: var(--space-2, 8px) var(--space-4, 16px);
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: var(--space-3, 12px);
+}
+
+/* The skip target should not show a focus ring when reached via the link. */
+main:focus {
+  outline: none;
+}

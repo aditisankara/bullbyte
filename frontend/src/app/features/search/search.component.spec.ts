@@ -54,6 +54,13 @@ describe('SearchComponent', () => {
     expect(el.querySelector('form[role="search"] input')).not.toBeNull();
   });
 
+  it('exposes a header landmark wrapping the page title (NFR20, 6.7)', () => {
+    const el = render().nativeElement as HTMLElement;
+    const header = el.querySelector('header');
+    expect(header).not.toBeNull();
+    expect(header?.querySelector('h1')?.textContent).toContain('BullByte');
+  });
+
   it('focuses the search input automatically (AC1)', async () => {
     const fixture = render();
     await fixture.whenStable();

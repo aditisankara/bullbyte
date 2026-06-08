@@ -158,6 +158,9 @@ import { TraceStep } from '../claim/claim';
       font-size: var(--text-xs);
       line-height: var(--lh-snug);
       color: var(--ink-2);
+      /* dense mono args/result must wrap, not overflow at 320px (NFR23, 6.7). */
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
     .trace__tool {
       color: var(--gold-2);

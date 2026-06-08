@@ -117,4 +117,13 @@ describe('ClaimDetailPanelComponent', () => {
     }).nativeElement as HTMLElement;
     expect(el.querySelector('.panel__source')).toBeNull();
   });
+
+  it('uses captions (not deep headings) for section labels — flat hierarchy (6.7, NFR20)', () => {
+    const el = render().nativeElement as HTMLElement;
+    // No h4/h5/h6 anywhere in the panel — section labels must not skip levels.
+    expect(el.querySelectorAll('h4, h5, h6').length).toBe(0);
+    const label = el.querySelector('.panel__label');
+    expect(label?.tagName.toLowerCase()).toBe('p');
+    expect(el.textContent).toContain('The claim');
+  });
 });

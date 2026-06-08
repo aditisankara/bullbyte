@@ -186,6 +186,7 @@ import {
       font-size: var(--text-2xl);
       line-height: 1.15;
       color: var(--ink);
+      overflow-wrap: anywhere; /* no overflow for long names at 320px (NFR23, 6.7) */
     }
     .company-header__ticker {
       margin-left: var(--space-2);

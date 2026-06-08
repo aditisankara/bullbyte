@@ -45,7 +45,7 @@ import { ReasoningTraceComponent } from '../reasoning-trace/reasoning-trace.comp
         </p>
 
         <section class="panel__section">
-          <h6 class="panel__label">The claim</h6>
+          <p class="panel__label">The claim</p>
           <blockquote class="panel__quote">{{ c.quote }}</blockquote>
           <p class="panel__attribution">— {{ c.speaker }}</p>
           @if (c.filing.url) {
@@ -67,7 +67,7 @@ import { ReasoningTraceComponent } from '../reasoning-trace/reasoning-trace.comp
                sets showComparison=false and the header delta carries the
                outcome; the confidence + low-confidence note always show. -->
           @if (showComparison()) {
-            <h6 class="panel__label">What actually happened</h6>
+            <p class="panel__label">What actually happened</p>
             <div class="panel__compare">
               <span class="panel__col">
                 <span class="panel__col-label">Claimed</span>
@@ -165,8 +165,15 @@ import { ReasoningTraceComponent } from '../reasoning-trace/reasoning-trace.comp
       padding: var(--space-4) var(--space-6) var(--space-5);
       border-bottom: 1px solid var(--rule);
     }
+    /* Section caption (not a heading — keeps the panel's heading hierarchy flat
+       under the page h1/h2; 6.7). */
     .panel__label {
       margin: 0 0 var(--space-2);
+      font-size: var(--text-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-wide);
+      color: var(--ink-3);
     }
     .panel__quote {
       margin: 0;
@@ -176,6 +183,7 @@ import { ReasoningTraceComponent } from '../reasoning-trace/reasoning-trace.comp
       color: var(--ink);
       border-left: 2px solid var(--ink);
       padding-left: var(--space-4);
+      overflow-wrap: anywhere;
     }
     .panel__attribution {
       margin: var(--space-2) 0 0;
