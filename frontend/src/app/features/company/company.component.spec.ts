@@ -31,6 +31,18 @@ const RUNNING_SUMMARY: CompanySummary = {
   latestJobId: 'job-9',
 };
 
+/** The score slot's 6.4 card fetches the score whenever the dashboard renders. */
+const NO_SCORE = {
+  ticker: 'TSLA',
+  score: null,
+  deliveredCount: 0,
+  missedCount: 0,
+  totalResolved: 0,
+  pendingCount: 0,
+  insufficientDataCount: 0,
+  context: 'No resolved claims yet',
+};
+
 describe('CompanyComponent', () => {
   let http: HttpTestingController;
   let sources: FakeEventSource[];
@@ -57,11 +69,20 @@ describe('CompanyComponent', () => {
     return fixture;
   }
 
+  /** Satisfy the score card's GET /score that fires whenever the dashboard renders. */
+  function flushScore(ticker = 'TSLA') {
+    http
+      .expectOne(`${environment.apiBaseUrl}/companies/${ticker}/score`)
+      .flush({ ...NO_SCORE, ticker });
+  }
+
   it('fetches the summary on load with no prior search (AC4)', () => {
     const fixture = render();
     const req = http.expectOne(`${environment.apiBaseUrl}/companies/TSLA`);
     expect(req.request.method).toBe('GET');
     req.flush(SUMMARY);
+    fixture.detectChanges();
+    flushScore();
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -74,19 +95,23 @@ describe('CompanyComponent', () => {
     http.expectOne(`${environment.apiBaseUrl}/companies/TSLA`).flush(SUMMARY);
   });
 
-  it('renders one h1 and the four pending layout sections (AC5)', () => {
+  it('renders one h1 and the four layout sections (AC5)', () => {
     const fixture = render();
     http.expectOne(`${environment.apiBaseUrl}/companies/TSLA`).flush(SUMMARY);
+    fixture.detectChanges();
+    flushScore();
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelectorAll('h1').length).toBe(1);
     expect(el.querySelector('app-company-page-layout')).not.toBeNull();
+    // The score slot now hosts the live 6.4 card (its own h2); the other three
+    // slots keep their pending placeholders until 6.3/6.5/6.6 wire them.
     const headings = Array.from(el.querySelectorAll('h2')).map(
       (h) => h.textContent?.trim(),
     );
     expect(headings).toEqual([
-      'CEO delivery score',
+      'CEO Delivery Score',
       'Promise timeline',
       'Claims',
       'Claim detail',
@@ -134,6 +159,8 @@ describe('CompanyComponent', () => {
       .expectOne(`${environment.apiBaseUrl}/companies/TSLA`)
       .flush({ ...SUMMARY, latestJobId: 'job-9' });
     fixture.detectChanges();
+    flushScore();
+    fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('app-analysis-progress')).toBeNull();
@@ -144,12 +171,16 @@ describe('CompanyComponent', () => {
     const fixture = render();
     http.expectOne(`${environment.apiBaseUrl}/companies/TSLA`).flush(SUMMARY);
     fixture.detectChanges();
+    flushScore('TSLA');
+    fixture.detectChanges();
 
     fixture.componentRef.setInput('ticker', 'NVDA');
     fixture.detectChanges();
     http
       .expectOne(`${environment.apiBaseUrl}/companies/NVDA`)
       .flush({ ...SUMMARY, id: 'c-2', ticker: 'NVDA', name: 'NVIDIA Corp.' });
+    fixture.detectChanges();
+    flushScore('NVDA');
     fixture.detectChanges();
 
     expect(
