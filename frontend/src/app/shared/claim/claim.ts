@@ -54,6 +54,9 @@ export interface TraceStep {
   args: string;
   result: string;
   citation?: { label: string; url: string };
+  /** The step the verification stopped at (INSUFFICIENT_DATA) — rendered as the
+   *  distinct failure/end-of-trace step (6.6, FR39 AC4). */
+  failure?: boolean;
 }
 
 /**

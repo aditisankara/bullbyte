@@ -182,35 +182,107 @@ describe('claim-mapping', () => {
       expect(toClaimDetail(detail({ edgarSourceUrl: null })).filing.url).toBe('');
     });
 
-    it('maps trace steps, deriving the tool label and an EDGAR citation', () => {
+    it('parses the structured toolCall into a humanised tool + key=value args (FR39)', () => {
       const d = toClaimDetail(
         detail({
           reasoningTrace: [
             {
-              stepIndex: 0,
-              toolCall: { tool: 'fetch_filing' },
-              resultSummary: 'Found the 8-K',
-              edgarFilingRef: 'https://www.sec.gov/edgar/tsla-8k',
-            },
-            {
               stepIndex: 1,
-              toolCall: 'opaque',
-              resultSummary: null,
-              edgarFilingRef: null,
+              toolCall: {
+                action: 'fetch_financial_actuals',
+                ticker: 'TSLA',
+                actuals_quarter: 'Q4-2024',
+              },
+              resultSummary: 'Fetched 10-K for Q4-2024',
+              edgarFilingRef: '10-K | TSLA | Q4-2024 | https://www.sec.gov/edgar/tsla-10k',
             },
           ],
         }),
       );
-      expect(d.trace[0]).toEqual({
-        tool: 'fetch_filing',
-        args: '',
-        result: 'Found the 8-K',
-        citation: { label: 'EDGAR filing', url: 'https://www.sec.gov/edgar/tsla-8k' },
+      expect(d.trace[0].tool).toBe('Fetch financial actuals');
+      expect(d.trace[0].args).toBe('ticker=TSLA, actuals_quarter=Q4-2024');
+      expect(d.trace[0].result).toBe('Fetched 10-K for Q4-2024');
+    });
+
+    it('parses the pipe-delimited edgarFilingRef into a type · ticker · quarter citation (FR39)', () => {
+      const d = toClaimDetail(
+        detail({
+          reasoningTrace: [
+            {
+              stepIndex: 1,
+              toolCall: { action: 'temporal_alignment' },
+              resultSummary: 'Aligned',
+              edgarFilingRef: '10-K | TSLA | Q4-2024 | https://www.sec.gov/edgar/tsla-10k',
+            },
+          ],
+        }),
+      );
+      expect(d.trace[0].citation).toEqual({
+        label: '10-K · TSLA · Q4 2024',
+        url: 'https://www.sec.gov/edgar/tsla-10k',
       });
-      // unparseable toolCall → generic label; no citation when no filing ref
-      expect(d.trace[1].tool).toBe('tool call');
-      expect(d.trace[1].result).toBe('');
+    });
+
+    it('omits the citation for a null or malformed edgarFilingRef (no broken href)', () => {
+      const d = toClaimDetail(
+        detail({
+          reasoningTrace: [
+            { stepIndex: 1, toolCall: { action: 'llm_verdict' }, resultSummary: 'x', edgarFilingRef: null },
+            { stepIndex: 2, toolCall: { action: 'llm_verdict' }, resultSummary: 'x', edgarFilingRef: 'not-pipe-delimited' },
+          ],
+        }),
+      );
+      expect(d.trace[0].citation).toBeUndefined();
       expect(d.trace[1].citation).toBeUndefined();
+    });
+
+    it('falls back to a generic label for an unparseable toolCall', () => {
+      const d = toClaimDetail(
+        detail({
+          reasoningTrace: [
+            { stepIndex: 1, toolCall: 'opaque', resultSummary: null, edgarFilingRef: null },
+          ],
+        }),
+      );
+      expect(d.trace[0].tool).toBe('tool call');
+      expect(d.trace[0].args).toBe('');
+      expect(d.trace[0].result).toBe('');
+    });
+
+    it('preserves trace order without truncation (AC3)', () => {
+      const steps = [1, 2, 3, 4].map((i) => ({
+        stepIndex: i,
+        toolCall: { action: 'temporal_alignment', i },
+        resultSummary: `step ${i}`,
+        edgarFilingRef: null,
+      }));
+      const d = toClaimDetail(detail({ reasoningTrace: steps }));
+      expect(d.trace.map((s) => s.result)).toEqual(['step 1', 'step 2', 'step 3', 'step 4']);
+    });
+
+    it('flags the final step as the failure for an INSUFFICIENT_DATA verdict (AC4)', () => {
+      const d = toClaimDetail(
+        detail({
+          verdict: verdict({ verdictType: 'INSUFFICIENT_DATA' }),
+          reasoningTrace: [
+            { stepIndex: 1, toolCall: { action: 'temporal_alignment' }, resultSummary: 'Aligned', edgarFilingRef: null },
+            { stepIndex: 2, toolCall: { action: 'unit_conflict' }, resultSummary: 'Unit conflict: …', edgarFilingRef: null },
+          ],
+        }),
+      );
+      expect(d.trace[0].failure).toBeUndefined();
+      expect(d.trace[1].failure).toBe(true);
+    });
+
+    it('does not flag any failure step for a resolved verdict', () => {
+      const d = toClaimDetail(
+        detail({
+          reasoningTrace: [
+            { stepIndex: 1, toolCall: { action: 'llm_verdict' }, resultSummary: 'DELIVERED', edgarFilingRef: null },
+          ],
+        }),
+      );
+      expect(d.trace[0].failure).toBeUndefined();
     });
 
     it('maps a pending claim (verdict null) to the PENDING tone', () => {

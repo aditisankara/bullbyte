@@ -74,4 +74,21 @@ describe('ReasoningTraceComponent', () => {
     expect(link.getAttribute('rel')).toContain('noopener');
     expect(link.textContent).toContain('10-K 2024');
   });
+
+  it('marks the failure step distinctly (6.6, AC4)', () => {
+    const fixture = render([
+      { tool: 'Temporal alignment', args: 'ticker=TSLA', result: 'Aligned' },
+      { tool: 'Unit conflict', args: '', result: 'Unit conflict: …', failure: true },
+    ]);
+    (fixture.nativeElement.querySelector('.trace__toggle') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const steps = el.querySelectorAll('.trace__step');
+    expect(steps[0].classList.contains('trace__step--failure')).toBe(false);
+    expect(steps[1].classList.contains('trace__step--failure')).toBe(true);
+    expect(steps[1].querySelector('.trace__failure-tag')?.textContent).toContain('trace ended here');
+    // the failure reason is still shown as the step result (AC4)
+    expect(steps[1].querySelector('.trace__result')?.textContent).toContain('Unit conflict');
+  });
 });

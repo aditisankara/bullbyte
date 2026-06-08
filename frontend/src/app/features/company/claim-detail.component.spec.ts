@@ -139,4 +139,46 @@ describe('ClaimDetailComponent', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(closed).toBe(false);
   });
+
+  it('expands the embedded trace with inline citations + the failure step end-to-end (6.6, AC1/AC2/AC4)', () => {
+    const insufficient: ClaimDetailApi = {
+      ...DETAIL,
+      verdict: { ...DETAIL.verdict!, verdictType: 'INSUFFICIENT_DATA' },
+      reasoningTrace: [
+        {
+          stepIndex: 1,
+          toolCall: { action: 'fetch_financial_actuals', ticker: 'TSLA' },
+          resultSummary: 'Fetched 10-K',
+          edgarFilingRef: '10-K | TSLA | Q4-2024 | https://www.sec.gov/edgar/tsla-10k',
+        },
+        {
+          stepIndex: 2,
+          toolCall: { action: 'unit_conflict' },
+          resultSummary: 'Unit conflict: cannot normalize',
+          edgarFilingRef: null,
+        },
+      ],
+    };
+    const fixture = render('cl-1');
+    flush(insufficient);
+    fixture.detectChanges();
+
+    // Collapsed by default (AC1) — expand it.
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.trace__steps')).toBeNull();
+    (el.querySelector('.trace__toggle') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    // AC2: inline citation with type · ticker · quarter, external new tab.
+    const cite = el.querySelector('a.trace__cite') as HTMLAnchorElement;
+    expect(cite.textContent).toContain('10-K · TSLA · Q4 2024');
+    expect(cite.getAttribute('target')).toBe('_blank');
+    expect(cite.getAttribute('href')).toBe('https://www.sec.gov/edgar/tsla-10k');
+
+    // AC4: the final step is the flagged failure/stop point.
+    const steps = el.querySelectorAll('.trace__step');
+    expect(steps.length).toBe(2);
+    expect(steps[1].classList.contains('trace__step--failure')).toBe(true);
+    expect(steps[1].textContent).toContain('Unit conflict');
+  });
 });
