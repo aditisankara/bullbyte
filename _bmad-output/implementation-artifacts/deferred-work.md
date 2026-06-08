@@ -1,5 +1,12 @@
 # Deferred Work
 
+## Deferred from: code review of 4-4-quantitative-delta-calculation-and-verification-confidence-scoring (2026-06-08)
+
+- Float arithmetic for financial delta — `_parse_numeric_value` returns `float` and delta arithmetic is IEEE-754; Decimal would eliminate precision loss on large currency values (e.g. $383,000,000,000 ± cents); address in a future numeric-precision story [`ml-sidecar/src/services/verification_service.py`]
+- `"raw"` vs `"raw"` magnitude mismatch silently accepted — delta between a multiplier target and raw absolute actual produces a meaningless value with no warning; requires a heuristic magnitude-difference threshold not specified in this story [`ml-sidecar/src/services/verification_service.py`]
+- No DB transaction wrapping `insert_verdict` + `insert_reasoning_trace` — partial failure mid-trace leaves an orphaned verdict row with no rollback; wrapping verdict+traces in a single `asyncpg` transaction belongs in a future DB reliability story [`ml-sidecar/src/services/verification_service.py`]
+- `step_index=1` hardcoded for unit-normalization trace entries — will conflict when multiple trace steps per verdict are written; address when full trace logging (story 4.5+) introduces step sequencing [`ml-sidecar/src/services/verification_service.py`]
+
 ## Deferred from: code review of 4-3-claim-verification-agent-verdict-engine (2026-06-07)
 
 - `zip(claim_ids, result.claims)` silently truncates with no assertion — not triggered by current code but a future deduplication step could silently skip tail claims [`ml-sidecar/src/routers/analysis_router.py`]

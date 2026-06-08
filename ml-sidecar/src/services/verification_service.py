@@ -101,7 +101,10 @@ def _parse_full_verdict_response(content: str | None) -> tuple[str, str | None, 
     verdict = data.get("verdict", "")
     if verdict not in {"DELIVERED", "MISSED", "INSUFFICIENT_DATA"}:
         verdict = "INSUFFICIENT_DATA"
-    return verdict, data.get("matched_metric"), data.get("reasoning", "")
+    matched_metric = data.get("matched_metric")
+    if not isinstance(matched_metric, str):
+        matched_metric = None
+    return verdict, matched_metric, data.get("reasoning", "")
 
 
 def _parse_numeric_value(value_str: str, unit_str: str | None) -> tuple[float, str] | None:
@@ -115,19 +118,20 @@ def _parse_numeric_value(value_str: str, unit_str: str | None) -> tuple[float, s
       otherwise        → tag "raw"
     """
     try:
+        has_percent_in_value = "%" in value_str
         cleaned = value_str.strip().replace(",", "").replace("$", "").replace("%", "")
         num = float(cleaned)
     except (ValueError, TypeError, AttributeError):
         return None
 
     unit = (unit_str or "").lower()
-    if "billion" in unit or (unit.endswith("b") and len(unit) <= 3):
+    if "billion" in unit or unit in {"b", "bn", "bil"}:
         return (num * 1_000_000_000.0, "currency")
-    if "million" in unit or (unit in {"m", "mm", "usd m", "$ m"}):
+    if "million" in unit or unit in {"m", "mm", "usd m", "$ m"}:
         return (num * 1_000_000.0, "currency")
-    if "trillion" in unit or (unit.endswith("t") and len(unit) <= 3):
+    if "trillion" in unit or unit in {"t", "tn", "tril"}:
         return (num * 1_000_000_000_000.0, "currency")
-    if "%" in (unit_str or "") or "percent" in unit:
+    if "%" in (unit_str or "") or "percent" in unit or has_percent_in_value:
         return (num, "percent")
     return (num, "raw")
 
@@ -156,9 +160,9 @@ def _compute_delta(
     target_num, target_tag = parsed_target
     actual_num, actual_tag = parsed_actual
 
-    # Incompatible unit families (e.g. percent vs currency/raw)
-    meaningful = {"currency", "percent"}
-    if target_tag in meaningful and actual_tag in meaningful and target_tag != actual_tag:
+    # Incompatible unit families: percent vs non-percent is always a conflict;
+    # currency vs raw is allowed ("USD" without a scale word is still an absolute amount)
+    if (target_tag == "percent") != (actual_tag == "percent"):
         return None, True  # Unit conflict
 
     delta = actual_num - target_num
@@ -183,8 +187,8 @@ def _compute_confidence(
     if matched_metric is None:
         return Decimal("0.30")
 
-    m_lower = matched_metric.lower()
-    c_lower = claim_metric.lower()
+    m_lower = matched_metric.strip().lower()
+    c_lower = claim_metric.strip().lower()
     is_direct_match = c_lower in m_lower or m_lower in c_lower
 
     if is_direct_match:
@@ -209,6 +213,7 @@ async def _insufficient_data(
     verdict_id = await insert_verdict(
         claim_id=claim_id,
         verdict_type="INSUFFICIENT_DATA",
+        delta=None,
         confidence_score=confidence_score,
     )
     if traces:
