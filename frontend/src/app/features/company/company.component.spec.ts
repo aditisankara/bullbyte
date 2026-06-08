@@ -408,6 +408,20 @@ describe('CompanyComponent', () => {
     http.expectNone(`${environment.apiBaseUrl}/claims/cl-1`);
   });
 
+  it('keeps a single h1 and a flat heading hierarchy with the detail open (6.7, NFR20)', () => {
+    const fixture = renderDashboardWithClaims();
+    fixture.componentRef.setInput('claim', 'cl-1');
+    fixture.detectChanges();
+    flushClaimDetail('cl-1');
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelectorAll('h1').length).toBe(1);
+    // Page uses h1 → h2 (sections/score) → h3 (claim cards); nothing deeper, so
+    // the open detail panel introduces no skipped heading levels.
+    expect(el.querySelectorAll('h4, h5, h6').length).toBe(0);
+  });
+
   it('clears ?claim= and returns focus to the card on close (AC5)', () => {
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);

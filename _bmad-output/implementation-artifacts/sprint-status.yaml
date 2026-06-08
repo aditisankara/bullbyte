@@ -158,7 +158,7 @@ development_status:
   6-3-promise-timeline-component-with-verdict-status: done          # merged to main (PR #94)
   6-4-ceo-delivery-score-card-component: done                    # merged to main (PR #95)
   6-5-claim-detail-panel-component: done                         # merged to main (PR #97)
-  6-6-reasoning-trace-component-with-inline-citations: review    # needs 6.5 — done; implemented 2026-06-08, frontend 164/164
-  6-7-shareable-urls-deep-linking-and-accessibility-audit: backlog  # caps Epic 6
+  6-6-reasoning-trace-component-with-inline-citations: done       # merged to main (PR #99)
+  6-7-shareable-urls-deep-linking-and-accessibility-audit: review  # caps Epic 6; implemented 2026-06-08, frontend 169/169
 
   epic-6-retrospective: optional

@@ -21,11 +21,13 @@ import { ErrorStateKind } from '../../shared/error-state/error-state.component';
   imports: [SearchInputComponent],
   template: `
     <section class="hero">
-      <h1 class="hero__title">BullByte</h1>
-      <p class="hero__tagline">
-        Did the CEO deliver? Executive promises, verified against what the
-        company actually filed.
-      </p>
+      <header class="hero__intro">
+        <h1 class="hero__title">BullByte</h1>
+        <p class="hero__tagline">
+          Did the CEO deliver? Executive promises, verified against what the
+          company actually filed.
+        </p>
+      </header>
       <app-search-input
         autofocus
         [state]="state()"
@@ -44,6 +46,12 @@ import { ErrorStateKind } from '../../shared/error-state/error-state.component';
       margin: 0 auto;
       padding: clamp(48px, 14vh, 140px) var(--gutter) var(--space-7);
       text-align: center;
+    }
+    .hero__intro {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-4);
     }
     .hero__title {
       margin: 0;
