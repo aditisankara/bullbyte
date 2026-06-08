@@ -1,6 +1,6 @@
 # Story 4.6: CEO Delivery Score Computation
 
-Status: review
+Status: done
 
 ## Story
 
@@ -438,7 +438,20 @@ claude-sonnet-4-6 (story implementation via bmad-dev-story, 2026-06-07)
 - ml-sidecar/src/db/queries.py (UPDATE — appended `get_verdicts_for_ticker()`)
 - ml-sidecar/tests/test_scoring.py (NEW)
 
+### Review Findings
+
+- [x] [Review][Decision] Ticker case normalization — resolved: normalize in the service via `ticker.upper()` [`scoring_service.py:18`]
+- [x] [Review][Patch] Test name mismatch — spec requires `test_get_verdicts_for_ticker_query_passes_ticker`; shipped as `test_get_verdicts_for_ticker_called_with_correct_ticker` [`ml-sidecar/tests/test_scoring.py:100`]
+- [x] [Review][Patch] Missing `missed_count == 0` assertion in `test_total_resolved_excludes_insufficient_and_pending` [`ml-sidecar/tests/test_scoring.py:55`]
+- [x] [Review][Patch] Missing `delivered_count == 0` and `missed_count == 0` assertions in `test_score_null_when_no_resolved_claims` [`ml-sidecar/tests/test_scoring.py:67`]
+- [x] [Review][Patch] No test for `REVISED` verdict type being silently excluded — spec explicitly names this as an architecture guardrail [`ml-sidecar/tests/test_scoring.py`]
+- [x] [Review][Patch] No assertion on non-null score `context_message` content — added `test_context_message_includes_pending_and_insufficient_annotations` [`ml-sidecar/tests/test_scoring.py`]
+- [x] [Review][Defer] No error handling on `pool.fetch()` — consistent with all other read helpers in `queries.py`; pre-existing pattern [`ml-sidecar/src/db/queries.py`] — deferred, pre-existing
+- [x] [Review][Defer] No model-level range constraint on `score` field (0.0–1.0) — computation guarantees the range; Field(ge=0, le=1) would be defensive hardening [`ml-sidecar/src/models/score_models.py`] — deferred, pre-existing
+- [x] [Review][Defer] No ticker validation for empty/blank string — should be enforced at the API boundary in story 5.6 [`ml-sidecar/src/services/scoring_service.py`] — deferred, pre-existing
+
 ## Change Log
 
 - 2026-06-07: Story created — ready for dev
 - 2026-06-07: Implemented story 4.6 — added `get_verdicts_for_ticker()` query, created `CeoDeliveryScore` model and `compute_ceo_delivery_score()` service, created `test_scoring.py` with 6 tests covering all ACs. 143/143 tests pass.
+- 2026-06-08: Code review complete — 1 decision-needed, 5 patches, 3 deferred, 11 dismissed.

@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: code review of 4-6-ceo-delivery-score-computation (2026-06-08)
+
+- No error handling on `pool.fetch()` in `get_verdicts_for_ticker` — consistent with all other read helpers in `queries.py`; add structured error logging when a reliability/observability story lands [`ml-sidecar/src/db/queries.py`]
+- No model-level range constraint on `score` field (0.0–1.0) — computation guarantees the range; `Field(ge=0.0, le=1.0)` would be defensive hardening; add in a future model-hardening pass [`ml-sidecar/src/models/score_models.py`]
+- No ticker validation for empty/blank string — `compute_ceo_delivery_score("")` silently returns `score=None`; input validation should be enforced at the API boundary in story 5.6 [`ml-sidecar/src/services/scoring_service.py`]
+
 ## Deferred from: code review of 4-5-structured-reasoning-trace-logger (2026-06-08)
 
 - `_make_filing_ref` could produce a malformed ref string (e.g. `"None | AAPL | None | https://..."`) if `filing_type` or `quarter` is `None` while `url` is non-empty — no known trigger path today, but the helper has no type guard on those fields [`ml-sidecar/src/services/verification_service.py:196`]

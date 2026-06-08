@@ -45,6 +45,7 @@ async def test_total_resolved_excludes_insufficient_and_pending():
         result = await compute_ceo_delivery_score("TSLA")
 
     assert result.total_resolved == 3
+    assert result.missed_count == 0
     assert result.score == pytest.approx(1.0)
     assert result.insufficient_data_count == 10
     assert result.pending_count == 5
@@ -62,6 +63,8 @@ async def test_score_null_when_no_resolved_claims():
 
     assert result.score is None
     assert result.total_resolved == 0
+    assert result.delivered_count == 0
+    assert result.missed_count == 0
     assert result.context_message == "No resolved claims yet"
 
 
@@ -96,11 +99,42 @@ async def test_context_message_always_present():
         new=AsyncMock(return_value=rows),
     ):
         has_score = await compute_ceo_delivery_score("AAPL")
-    assert has_score.context_message and len(has_score.context_message) > 0
+    assert has_score.context_message == "2 of 3 resolved promises delivered"
 
 
 @pytest.mark.asyncio
-async def test_get_verdicts_for_ticker_called_with_correct_ticker():
+async def test_context_message_includes_pending_and_insufficient_annotations():
+    """context_message includes pending and insufficient-data annotations when non-zero."""
+    rows = _mock_verdict_rows({"DELIVERED": 4, "MISSED": 1, "PENDING": 2, "INSUFFICIENT_DATA": 3})
+    with patch(
+        "src.services.scoring_service.get_verdicts_for_ticker",
+        new=AsyncMock(return_value=rows),
+    ):
+        result = await compute_ceo_delivery_score("GOOG")
+
+    assert "4 of 5 resolved promises delivered" in result.context_message
+    assert "2 pending" in result.context_message
+    assert "3 insufficient data" in result.context_message
+
+
+@pytest.mark.asyncio
+async def test_revised_verdict_type_silently_excluded():
+    """REVISED verdicts are excluded from all counts and do not affect the score."""
+    rows = _mock_verdict_rows({"DELIVERED": 3, "MISSED": 1, "REVISED": 5})
+    with patch(
+        "src.services.scoring_service.get_verdicts_for_ticker",
+        new=AsyncMock(return_value=rows),
+    ):
+        result = await compute_ceo_delivery_score("AMZN")
+
+    assert result.total_resolved == 4
+    assert result.score == pytest.approx(0.75)
+    assert result.delivered_count == 3
+    assert result.missed_count == 1
+
+
+@pytest.mark.asyncio
+async def test_get_verdicts_for_ticker_query_passes_ticker():
     """get_verdicts_for_ticker receives the ticker string passed to compute_ceo_delivery_score."""
     mock_query = AsyncMock(return_value=[])
     with patch("src.services.scoring_service.get_verdicts_for_ticker", new=mock_query):
