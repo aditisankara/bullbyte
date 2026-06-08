@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AnalyzeResponse, CompanySummary } from './company.models';
+import { AnalyzeResponse, CeoScoreDto, CompanySummary } from './company.models';
 
 /**
  * Typed client for the company endpoints (5.1 + 5.4). Raw error bodies never
@@ -25,6 +25,13 @@ export class CompanyApiService {
   getSummary(ticker: string): Observable<CompanySummary> {
     return this.http.get<CompanySummary>(
       `${this.base}/${encodeURIComponent(ticker)}`,
+    );
+  }
+
+  /** CEO Delivery Score with sample-size context (FR22–FR24, 5.6). */
+  getScore(ticker: string): Observable<CeoScoreDto> {
+    return this.http.get<CeoScoreDto>(
+      `${this.base}/${encodeURIComponent(ticker)}/score`,
     );
   }
 }

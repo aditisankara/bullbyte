@@ -20,12 +20,12 @@ interface StatRow {
   template: `
     @if (score(); as s) {
       <section class="score">
-        <div
-          class="score__ring"
-          role="img"
-          [attr.aria-label]="'CEO delivery score ' + s.score.toFixed(1) + ' out of 10'"
-        >
-          <svg [attr.viewBox]="'0 0 ' + size + ' ' + size" class="score__ring-svg">
+        <div class="score__ring">
+          <svg
+            [attr.viewBox]="'0 0 ' + size + ' ' + size"
+            class="score__ring-svg"
+            aria-hidden="true"
+          >
             <circle [attr.cx]="size / 2" [attr.cy]="size / 2" [attr.r]="radius" class="score__track" />
             <circle
               [attr.cx]="size / 2"
@@ -36,32 +36,39 @@ interface StatRow {
               [attr.stroke-dashoffset]="dashOffset()"
             />
           </svg>
-          <div class="score__ring-num">
+          <!-- The score value is the card's heading so it is reachable by
+               screen-reader heading navigation; aria-label reads as one phrase. -->
+          <h2 class="score__ring-num" [attr.aria-label]="scoreHeadingLabel()">
             <span class="score__num">{{ s.score.toFixed(1) }}</span>
             <span class="score__denom mono">/ 10</span>
-          </div>
+          </h2>
         </div>
 
         <div class="score__meta">
-          <h2 class="score__title">CEO Delivery Score</h2>
-          <p class="score__context">
-            <strong>{{ s.ceo }}</strong
-            >@if (s.company) { · {{ s.company }} } · {{ sampleContext() }}
+          <p class="score__title">CEO Delivery Score</p>
+          <p class="score__context" [attr.aria-label]="sampleContext()">
+            @if (s.ceo) {
+              <strong>{{ s.ceo }}</strong
+              >@if (s.company) { · {{ s.company }} } ·
+            }
+            {{ sampleContext() }}
           </p>
 
-          <div class="score__trend" [attr.data-trend]="s.trend">
-            <svg class="score__trend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              @switch (s.trend) {
-                @case ('up') { <path d="M5 16 L12 9 L19 16" /> }
-                @case ('down') { <path d="M5 8 L12 15 L19 8" /> }
-                @case ('flat') { <path d="M5 12 H19" /> }
+          @if (showTrend()) {
+            <div class="score__trend" [attr.data-trend]="s.trend">
+              <svg class="score__trend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                @switch (s.trend) {
+                  @case ('up') { <path d="M5 16 L12 9 L19 16" /> }
+                  @case ('down') { <path d="M5 8 L12 15 L19 8" /> }
+                  @case ('flat') { <path d="M5 12 H19" /> }
+                }
+              </svg>
+              <span class="score__trend-label">{{ trendText() }}</span>
+              @if (s.trendLabel) {
+                <span class="score__trend-detail mono">{{ s.trendLabel }}</span>
               }
-            </svg>
-            <span class="score__trend-label">{{ trendText() }}</span>
-            @if (s.trendLabel) {
-              <span class="score__trend-detail mono">{{ s.trendLabel }}</span>
-            }
-          </div>
+            </div>
+          }
 
           <ul class="score__stats">
             @for (stat of stats(); track stat.token) {
@@ -110,6 +117,7 @@ interface StatRow {
     .score__ring-num {
       position: absolute;
       inset: 0;
+      margin: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -200,9 +208,26 @@ interface StatRow {
 export class CeoScoreCardComponent {
   readonly score = input.required<CeoScore | null>();
 
+  /**
+   * Opt-in overrides for consumers whose API doesn't supply every field
+   * (6.4). Defaults preserve the original 2.6 behaviour.
+   */
+  /** Replace the self-computed sample-size sentence with an authoritative one. */
+  readonly contextOverride = input<string>('');
+  /** Hide the trend indicator when there's no prior-window comparison. */
+  readonly showTrend = input<boolean>(true);
+  /** Hide the Revised stat when the source excludes REVISED verdicts. */
+  readonly showRevised = input<boolean>(true);
+
   protected readonly size = 140;
   protected readonly radius = this.size / 2 - 10;
   protected readonly circumference = 2 * Math.PI * this.radius;
+
+  /** AC3 — a coherent accessible name for the score heading. */
+  protected readonly scoreHeadingLabel = computed(() => {
+    const s = this.score();
+    return s ? `CEO Delivery Score ${s.score.toFixed(1)} out of 10` : '';
+  });
 
   protected readonly dashOffset = computed(() => {
     const s = this.score();
@@ -214,6 +239,10 @@ export class CeoScoreCardComponent {
   protected readonly sampleContext = computed(() => {
     const s = this.score();
     if (!s) return '';
+    // An authoritative sentence from the API wins over the self-computed one
+    // (and sidesteps the absent `quarters` field for API-fed consumers).
+    const override = this.contextOverride();
+    if (override) return override;
     const resolved = resolvedCount(s.counts);
     const window = `last ${s.quarters} ${s.quarters === 1 ? 'quarter' : 'quarters'}`;
     if (resolved === 0) {
@@ -240,8 +269,10 @@ export class CeoScoreCardComponent {
       { token: 'delivered', label: 'Delivered', value: s.counts.delivered },
       { token: 'missed', label: 'Missed', value: s.counts.missed },
       { token: 'pending', label: 'Pending', value: s.counts.pending },
-      { token: 'revised', label: 'Revised', value: s.counts.revised },
     ];
+    if (this.showRevised()) {
+      rows.push({ token: 'revised', label: 'Revised', value: s.counts.revised });
+    }
     if (s.counts.insufficient != null) {
       rows.push({ token: 'insufficient', label: 'Insufficient', value: s.counts.insufficient });
     }

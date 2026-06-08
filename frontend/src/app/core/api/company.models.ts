@@ -35,3 +35,22 @@ export interface CachedAnalyzeResponse {
  * Discriminated on `status`: 202 for a freshly queued job, 200 for a cache hit.
  */
 export type AnalyzeResponse = QueuedAnalyzeResponse | CachedAnalyzeResponse;
+
+/**
+ * `GET /api/v1/companies/:ticker/score` — mirrors the API's `CeoScoreDto` (5.6).
+ * Wire shape only; the 2.6 presentation model lives in `shared/score/ceo-score.ts`
+ * and the 6.4 smart card adapts between them.
+ *
+ * `score` is `deliveredCount / totalResolved` on a **0–1** scale (not 0–10), or
+ * `null` — never 0 — when no verdicts have resolved. `context` is always present.
+ */
+export interface CeoScoreDto {
+  ticker: string;
+  score: number | null;
+  deliveredCount: number;
+  missedCount: number;
+  totalResolved: number; // deliveredCount + missedCount only
+  pendingCount: number;
+  insufficientDataCount: number;
+  context: string;
+}

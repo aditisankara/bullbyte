@@ -18,6 +18,7 @@ import {
   ErrorStateKind,
 } from '../../shared/error-state/error-state.component';
 import { AnalysisProgressComponent } from './analysis-progress.component';
+import { ScoreCardComponent } from './score-card.component';
 
 /**
  * Company page — `/company/:ticker` (6.1). Fetches the company summary on
@@ -37,6 +38,7 @@ import { AnalysisProgressComponent } from './analysis-progress.component';
     CompanyPageLayoutComponent,
     ErrorStateComponent,
     AnalysisProgressComponent,
+    ScoreCardComponent,
   ],
   template: `
     @switch (state()) {
@@ -88,8 +90,8 @@ import { AnalysisProgressComponent } from './analysis-progress.component';
         } @else {
           <app-company-page-layout>
             <section score>
-              <h2 class="pending__heading">CEO delivery score</h2>
-              <p class="pending__body">The score appears once analysis completes.</p>
+              <!-- 6.4: the CEO Delivery Score card fetches the score itself. -->
+              <app-score-card [ticker]="normalisedTicker()" />
             </section>
             <section timeline>
               <h2 class="pending__heading">Promise timeline</h2>
