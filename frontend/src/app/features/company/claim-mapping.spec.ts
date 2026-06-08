@@ -1,7 +1,12 @@
-import { ClaimListItem, ClaimVerdictApi } from '../../core/api/claim.models';
+import {
+  ClaimDetailApi,
+  ClaimListItem,
+  ClaimVerdictApi,
+} from '../../core/api/claim.models';
 import {
   buildTimeline,
   normaliseQuarterKey,
+  toClaimDetail,
   toClaimSummaries,
 } from './claim-mapping';
 
@@ -136,6 +141,80 @@ describe('claim-mapping', () => {
       ]);
       expect(keys).toEqual(['Q1-2022', 'Q4-2024']);
       expect(columns.length).toBe(2);
+    });
+  });
+
+  describe('toClaimDetail', () => {
+    function detail(overrides: Partial<ClaimDetailApi> = {}): ClaimDetailApi {
+      return {
+        ...claim(),
+        edgarSourceUrl: 'https://www.sec.gov/edgar/tsla-8k',
+        lowConfidence: false,
+        reasoningTrace: [],
+        ...overrides,
+      };
+    }
+
+    it('carries the summary fields and composes the claimed value with its unit', () => {
+      const d = toClaimDetail(detail());
+      expect(d.quarter).toBe('Q3 2024');
+      expect(d.quote).toBe('We expect MAU to reach 620M.');
+      expect(d.verdict).toBe('DELIVERED');
+      expect(d.claimed).toBe('620M users');
+    });
+
+    it('hides the comparison fields the 5.5 API does not return', () => {
+      const d = toClaimDetail(detail());
+      expect(d.actual).toBe('');
+      expect(d.actualFiling).toEqual({ type: '', quarter: '', url: '' });
+      // delta still carries the quantitative outcome (FR37)
+      expect(d.delta).toBe('+5M (+1.0%)');
+    });
+
+    it('maps the EDGAR source url into the filing (no type from the API)', () => {
+      const d = toClaimDetail(detail());
+      expect(d.filing.url).toBe('https://www.sec.gov/edgar/tsla-8k');
+      expect(d.filing.quarter).toBe('Q3 2024');
+      expect(d.filing.type).toBe('');
+    });
+
+    it('yields an empty filing url when edgarSourceUrl is null', () => {
+      expect(toClaimDetail(detail({ edgarSourceUrl: null })).filing.url).toBe('');
+    });
+
+    it('maps trace steps, deriving the tool label and an EDGAR citation', () => {
+      const d = toClaimDetail(
+        detail({
+          reasoningTrace: [
+            {
+              stepIndex: 0,
+              toolCall: { tool: 'fetch_filing' },
+              resultSummary: 'Found the 8-K',
+              edgarFilingRef: 'https://www.sec.gov/edgar/tsla-8k',
+            },
+            {
+              stepIndex: 1,
+              toolCall: 'opaque',
+              resultSummary: null,
+              edgarFilingRef: null,
+            },
+          ],
+        }),
+      );
+      expect(d.trace[0]).toEqual({
+        tool: 'fetch_filing',
+        args: '',
+        result: 'Found the 8-K',
+        citation: { label: 'EDGAR filing', url: 'https://www.sec.gov/edgar/tsla-8k' },
+      });
+      // unparseable toolCall → generic label; no citation when no filing ref
+      expect(d.trace[1].tool).toBe('tool call');
+      expect(d.trace[1].result).toBe('');
+      expect(d.trace[1].citation).toBeUndefined();
+    });
+
+    it('maps a pending claim (verdict null) to the PENDING tone', () => {
+      expect(toClaimDetail(detail({ verdict: null })).verdict).toBe('PENDING');
     });
   });
 

@@ -6,7 +6,7 @@ import {
 } from '@angular/common/http/testing';
 import { CompanyApiService } from './company-api.service';
 import { AnalyzeResponse, CeoScoreDto, CompanySummary } from './company.models';
-import { ClaimListResponse } from './claim.models';
+import { ClaimDetailApi, ClaimListResponse } from './claim.models';
 import { environment } from '../../../environments/environment';
 
 describe('CompanyApiService', () => {
@@ -108,5 +108,37 @@ describe('CompanyApiService', () => {
     http.expectOne(`${environment.apiBaseUrl}/companies/TSLA/score`).flush(score);
 
     expect(response?.score).toBeNull();
+  });
+
+  it('GETs /claims/:claimId and returns the claim detail', () => {
+    const detail: ClaimDetailApi = {
+      id: 'cl-1',
+      quarter: 'Q3-2024',
+      rawQuote: 'We expect MAU to reach 620M.',
+      speaker: 'Daniel Ek',
+      metric: 'MAU guidance',
+      targetValue: '620M',
+      targetUnit: 'users',
+      extractionConfidence: 0.82,
+      verdict: {
+        id: 'v-1',
+        verdictType: 'MISSED',
+        delta: '−18M (−2.9%)',
+        confidenceScore: 0.55,
+        isCorrection: false,
+        createdAt: '2026-06-01T00:00:00.000Z',
+      },
+      edgarSourceUrl: 'https://www.sec.gov/edgar/tsla-8k',
+      lowConfidence: true,
+      reasoningTrace: [],
+    };
+    let response: ClaimDetailApi | undefined;
+    service.getClaimDetail('cl-1').subscribe((r) => (response = r));
+
+    const req = http.expectOne(`${environment.apiBaseUrl}/claims/cl-1`);
+    expect(req.request.method).toBe('GET');
+    req.flush(detail);
+
+    expect(response).toEqual(detail);
   });
 });

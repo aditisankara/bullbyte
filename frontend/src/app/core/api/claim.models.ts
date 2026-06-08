@@ -49,3 +49,26 @@ export interface ClaimListResponse {
   data: ClaimListItem[];
   meta: ClaimListMeta;
 }
+
+/**
+ * One ordered step of the verification reasoning — mirrors `ReasoningTraceStepDto`.
+ * `toolCall` is opaque jsonb (shape owned by the ML sidecar); the per-step
+ * citation deepening is Story 6.6's concern.
+ */
+export interface ReasoningTraceStepApi {
+  stepIndex: number | null;
+  toolCall: unknown;
+  resultSummary: string | null;
+  edgarFilingRef: string | null;
+}
+
+/**
+ * `GET /api/v1/claims/:claimId` — mirrors `ClaimDetailDto` (5.5). Extends the
+ * list item with the EDGAR source URL, the low-confidence flag, and the trace.
+ * The verdict is `null` while pending; `reasoningTrace` shows the steps so far.
+ */
+export interface ClaimDetailApi extends ClaimListItem {
+  edgarSourceUrl: string | null;
+  lowConfidence: boolean;
+  reasoningTrace: ReasoningTraceStepApi[];
+}

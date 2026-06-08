@@ -23,6 +23,7 @@ import { PromiseTimelineComponent } from '../../shared/promise-timeline/promise-
 import { ClaimCardComponent } from '../../shared/claim-card/claim-card.component';
 import { AnalysisProgressComponent } from './analysis-progress.component';
 import { ScoreCardComponent } from './score-card.component';
+import { ClaimDetailComponent } from './claim-detail.component';
 import {
   buildTimeline,
   normaliseQuarterKey,
@@ -52,6 +53,7 @@ import {
     ClaimCardComponent,
     AnalysisProgressComponent,
     ScoreCardComponent,
+    ClaimDetailComponent,
   ],
   template: `
     @switch (state()) {
@@ -151,10 +153,15 @@ import {
               }
             </section>
 
-            <section detail>
-              <h2 class="pending__heading">Claim detail</h2>
-              <p class="pending__body">Select a claim to see its reasoning trace.</p>
-            </section>
+            <!-- 6.5: claim detail — the ?claim= param drives it, so the open
+                 panel is deep-linkable and shareable; (closed) clears the
+                 selection and returns focus to the card (AC4, AC5). -->
+            <app-claim-detail
+              detail
+              [claimId]="selectedClaimId()"
+              [shareUrl]="shareUrl()"
+              (closed)="onCloseClaim()"
+            />
           </app-company-page-layout>
         }
       }
@@ -238,6 +245,8 @@ export class CompanyComponent {
   readonly ticker = input.required<string>();
   /** `?quarter=` query param, bound the same way — the timeline filter (AC3). */
   readonly quarter = input<string>();
+  /** `?claim=` query param — the open claim detail (6.5 AC4 deep-link/share). */
+  readonly claim = input<string>();
 
   private readonly api = inject(CompanyApiService);
   private readonly router = inject(Router);
@@ -252,8 +261,15 @@ export class CompanyComponent {
   protected readonly claimsState = signal<LoadState>('idle');
   private readonly claims = signal<ClaimListItem[]>([]);
 
-  /** Currently selected claim — the selection contract 6.5's detail panel consumes. */
-  protected readonly selectedClaimId = signal<string | null>(null);
+  /**
+   * Currently selected claim, driven by the `?claim=` URL param (6.5). Making
+   * the selection the URL means the open panel is deep-linkable and shareable
+   * (AC4) and survives a direct/bookmarked load.
+   */
+  protected readonly selectedClaimId = computed(() => this.claim()?.trim() || null);
+
+  /** The card element that opened the panel — refocused on close (AC5, NFR21). */
+  private claimTrigger: HTMLElement | null = null;
 
   /**
    * 6.2: jobId of a run that is currently live — non-null only while the
@@ -289,6 +305,13 @@ export class CompanyComponent {
     const items =
       key === null ? this.claims() : this.claims().filter((c) => c.quarter === key);
     return toClaimSummaries(items);
+  });
+
+  /** Absolute deep link for the open claim (FR41) — the current URL, which now
+   *  carries `?claim=`. Recomputes when the selection changes. */
+  protected readonly shareUrl = computed(() => {
+    if (!this.selectedClaimId() || typeof location === 'undefined') return undefined;
+    return location.origin + this.router.url;
   });
 
   protected normalisedTicker(): string {
@@ -349,9 +372,33 @@ export class CompanyComponent {
     });
   }
 
-  /** Card activation → record the selection for 6.5's detail panel (AC4). */
+  /**
+   * Card activation → open the detail panel by writing `?claim=` to the URL
+   * (AC4). Capture the triggering element first so close can return focus to
+   * the exact card (AC5, NFR21).
+   */
   protected onSelectClaim(id: string): void {
-    this.selectedClaimId.set(id);
+    this.claimTrigger =
+      typeof document !== 'undefined'
+        ? (document.activeElement as HTMLElement | null)
+        : null;
+    void this.router.navigate(['/company', this.normalisedTicker()], {
+      queryParams: { claim: id },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  /** Detail closed (Escape or the close control) → clear `?claim=` and return
+   *  focus to the card that opened it (AC5, NFR21). */
+  protected onCloseClaim(): void {
+    const trigger = this.claimTrigger;
+    this.claimTrigger = null;
+    void this.router
+      .navigate(['/company', this.normalisedTicker()], {
+        queryParams: { claim: null },
+        queryParamsHandling: 'merge',
+      })
+      .then(() => trigger?.focus());
   }
 
   private isLive(summary: CompanySummary): boolean {
