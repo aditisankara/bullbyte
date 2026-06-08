@@ -49,7 +49,7 @@
 # that doesn't conflict with the other developer's active story.
 
 generated: "2026-05-01"
-last_updated: "2026-06-07"  # story 1.1 + 1.3 + 1.5 + 1.6 done; Epic 1 complete; 3.1–3.7 done; 3.8 ready-for-dev; Epic 4 started; 4.1 done; 4.2 done; 4.3 done; 4.4 ready-for-dev; 4.5 review; 4.6 ready-for-dev; 2.1–2.6 done + merged to main (PR #82); Epic 2 complete; 5.1–5.4 done; Epic 6 unblocked (6.1 + 6.2)
+last_updated: "2026-06-07"  # story 1.1 + 1.3 + 1.5 + 1.6 done; Epic 1 complete; 3.1–3.7 done; 3.8 ready-for-dev; Epic 4 started; 4.1 done; 4.2 done; 4.3 done; 4.4 ready-for-dev; 4.5 review; 4.6 ready-for-dev; 2.1–2.6 done + merged to main (PR #82); Epic 2 complete; 5.1–5.4 done; Epic 6 unblocked (6.1 + 6.2); 6.1 done (PR #86); 6.2 review
 project: bullbyte
 project_key: NOKEY
 tracking_system: file-system
@@ -141,7 +141,7 @@ development_status:
   5-3-fastapi-to-nestjs-webhook-progress-relay: done     # needs 5.2 + 1.3 (PR #69)
   5-4-company-and-search-api-endpoints: done             # needs 1.4; parallel with 5.1 (PR #63)
   5-5-claims-timeline-and-claim-detail-api-endpoints: backlog  # needs 5.4 + Epic 4
-  5-6-ceo-score-endpoint-and-immutable-verdict-writes: backlog # needs 4.6 + 5.4
+  5-6-ceo-score-endpoint-and-immutable-verdict-writes: review # needs 4.6 + 5.4 — both done; implemented 2026-06-07
 
   epic-5-retrospective: optional
 
@@ -153,8 +153,8 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   epic-6: backlog
 
-  6-1-ticker-search-component-and-company-page-routing: ready-for-dev  # needs 1.5 + 5.4 — both done; unblocked
-  6-2-analysis-progress-feed-component-sse: ready-for-dev              # needs 1.5 + 5.2 — both done; unblocked
+  6-1-ticker-search-component-and-company-page-routing: done           # merged to main (PR #86)
+  6-2-analysis-progress-feed-component-sse: review                     # implemented; PR pending
   6-3-promise-timeline-component-with-verdict-status: backlog    # needs 1.5 + 5.5
   6-4-ceo-delivery-score-card-component: backlog                 # needs 1.5 + 5.6
   6-5-claim-detail-panel-component: backlog                      # needs 1.5 + 5.5

@@ -70,6 +70,7 @@ export const claims = pgTable(
 		rawQuote: text('raw_quote').notNull(),
 		metric: text('metric').notNull(),
 		targetValue: text('target_value').notNull(),
+		targetUnit: text('target_unit'), // e.g. "billion USD", "percent"; null when the model gave none
 		extractionConfidence: numeric('extraction_confidence', {
 			precision: 4,
 			scale: 3,
@@ -165,11 +166,11 @@ export const transcripts = pgTable(
 	{
 		id: uuid('id').primaryKey().defaultRandom(),
 		ticker: text('ticker').notNull(),
-		quarter: text('quarter').notNull(),     // "Q3-2024" format
+		quarter: text('quarter').notNull(), // "Q3-2024" format
 		filingDate: text('filing_date').notNull(),
 		rawText: text('raw_text').notNull(),
 		filingUrl: text('filing_url').notNull(),
-		parseStatus: text('parse_status').notNull(),  // "SUCCESS" or "PRESS_RELEASE" when cached
+		parseStatus: text('parse_status').notNull(), // "SUCCESS" or "PRESS_RELEASE" when cached
 		ingestedAt: timestamp('ingested_at', { withTimezone: true })
 			.defaultNow()
 			.notNull(),
@@ -188,17 +189,20 @@ export const financialActuals = pgTable(
 	{
 		id: uuid('id').primaryKey().defaultRandom(),
 		ticker: text('ticker').notNull(),
-		quarter: text('quarter').notNull(),     // "Q3-2024" format
-		filingType: text('filing_type').notNull(),  // "10-Q" or "10-K"
-		status: text('status').notNull(),       // "SUCCESS" or "PARTIAL" when cached
+		quarter: text('quarter').notNull(), // "Q3-2024" format
+		filingType: text('filing_type').notNull(), // "10-Q" or "10-K"
+		status: text('status').notNull(), // "SUCCESS" or "PARTIAL" when cached
 		filingUrl: text('filing_url').notNull(),
-		metrics: jsonb('metrics').notNull(),    // serialised list[FinancialMetric]
+		metrics: jsonb('metrics').notNull(), // serialised list[FinancialMetric]
 		ingestedAt: timestamp('ingested_at', { withTimezone: true })
 			.defaultNow()
 			.notNull(),
 	},
 	(t) => [
-		unique('financial_actuals_ticker_quarter_unique').on(t.ticker, t.quarter),
+		unique('financial_actuals_ticker_quarter_unique').on(
+			t.ticker,
+			t.quarter
+		),
 		index('idx_financial_actuals_ticker').on(t.ticker),
 	]
 );

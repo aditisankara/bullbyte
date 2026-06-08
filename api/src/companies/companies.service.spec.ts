@@ -36,7 +36,7 @@ describe('CompaniesService', () => {
 					lastAnalysedAt: analysedAt,
 				},
 			])
-			.mockResolvedValueOnce([{ status: 'COMPLETED' }]);
+			.mockResolvedValueOnce([{ id: 'job-1', status: 'COMPLETED' }]);
 
 		const result = await service.getSummary('TSLA');
 
@@ -46,6 +46,7 @@ describe('CompaniesService', () => {
 			name: 'Tesla, Inc.',
 			lastAnalysedAt: '2026-05-01T12:00:00.000Z',
 			jobStatus: 'COMPLETED',
+			latestJobId: 'job-1',
 		});
 	});
 
@@ -65,6 +66,7 @@ describe('CompaniesService', () => {
 
 		expect(result.lastAnalysedAt).toBeNull();
 		expect(result.jobStatus).toBeNull();
+		expect(result.latestJobId).toBeNull();
 	});
 
 	it('throws a TICKER_NOT_FOUND NotFoundException when the ticker is absent (AC2)', async () => {

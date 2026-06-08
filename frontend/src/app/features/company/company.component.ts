@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   effect,
   inject,
   input,
@@ -16,6 +17,7 @@ import {
   ErrorStateComponent,
   ErrorStateKind,
 } from '../../shared/error-state/error-state.component';
+import { AnalysisProgressComponent } from './analysis-progress.component';
 
 /**
  * Company page — `/company/:ticker` (6.1). Fetches the company summary on
@@ -30,7 +32,12 @@ import {
   selector: 'app-company',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, CompanyPageLayoutComponent, ErrorStateComponent],
+  imports: [
+    DatePipe,
+    CompanyPageLayoutComponent,
+    ErrorStateComponent,
+    AnalysisProgressComponent,
+  ],
   template: `
     @switch (state()) {
       @case ('loading') {
@@ -64,24 +71,40 @@ import {
           </header>
         }
 
-        <app-company-page-layout>
-          <section score>
-            <h2 class="pending__heading">CEO delivery score</h2>
-            <p class="pending__body">The score appears once analysis completes.</p>
+        @if (liveJobId(); as jobId) {
+          <!-- 6.2: live analysis run — the SSE feed replaces the placeholder
+               grid; (completed) refetches the summary so the dashboard
+               re-renders without a manual refresh (AC3). -->
+          <section class="live-run" aria-labelledby="live-run-heading">
+            <h2 id="live-run-heading" class="live-run__heading">
+              Analysing {{ normalisedTicker() }}…
+            </h2>
+            <app-analysis-progress
+              [jobId]="jobId"
+              [ticker]="normalisedTicker()"
+              (completed)="load()"
+            />
           </section>
-          <section timeline>
-            <h2 class="pending__heading">Promise timeline</h2>
-            <p class="pending__body">Extracted promises will be plotted here.</p>
-          </section>
-          <section claims>
-            <h2 class="pending__heading">Claims</h2>
-            <p class="pending__body">Verified claims will be listed here.</p>
-          </section>
-          <section detail>
-            <h2 class="pending__heading">Claim detail</h2>
-            <p class="pending__body">Select a claim to see its reasoning trace.</p>
-          </section>
-        </app-company-page-layout>
+        } @else {
+          <app-company-page-layout>
+            <section score>
+              <h2 class="pending__heading">CEO delivery score</h2>
+              <p class="pending__body">The score appears once analysis completes.</p>
+            </section>
+            <section timeline>
+              <h2 class="pending__heading">Promise timeline</h2>
+              <p class="pending__body">Extracted promises will be plotted here.</p>
+            </section>
+            <section claims>
+              <h2 class="pending__heading">Claims</h2>
+              <p class="pending__body">Verified claims will be listed here.</p>
+            </section>
+            <section detail>
+              <h2 class="pending__heading">Claim detail</h2>
+              <p class="pending__body">Select a claim to see its reasoning trace.</p>
+            </section>
+          </app-company-page-layout>
+        }
       }
     }
   `,
@@ -118,6 +141,16 @@ import {
       font-size: var(--text-xs);
       color: var(--ink-3);
     }
+    .live-run {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 var(--gutter) var(--space-7);
+    }
+    .live-run__heading {
+      margin: 0 0 var(--space-3);
+      font-size: var(--text-md);
+      color: var(--ink);
+    }
     .pending__heading {
       margin: 0 0 var(--space-2);
       font-size: var(--text-md);
@@ -140,6 +173,18 @@ export class CompanyComponent {
   protected readonly state = signal<LoadState>('idle');
   protected readonly errorKind = signal<ErrorStateKind>('ticker-not-found');
   protected readonly company = signal<CompanySummary | null>(null);
+
+  /**
+   * 6.2: jobId of a run that is currently live — non-null only while the
+   * latest job is QUEUED/RUNNING, which swaps the placeholder grid for the
+   * SSE progress feed (AC1).
+   */
+  protected readonly liveJobId = computed(() => {
+    const c = this.company();
+    return c && (c.jobStatus === 'QUEUED' || c.jobStatus === 'RUNNING')
+      ? c.latestJobId
+      : null;
+  });
 
   protected normalisedTicker(): string {
     return this.ticker().trim().toUpperCase();

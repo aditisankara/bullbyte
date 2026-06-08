@@ -42,6 +42,7 @@ describe('CompanyApiService', () => {
       name: 'Tesla, Inc.',
       lastAnalysedAt: '2026-06-01T00:00:00.000Z',
       jobStatus: 'COMPLETED',
+      latestJobId: 'job-1',
     };
     let response: CompanySummary | undefined;
     service.getSummary('TSLA').subscribe((r) => (response = r));

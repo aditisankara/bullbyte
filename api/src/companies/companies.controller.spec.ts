@@ -17,6 +17,7 @@ describe('CompaniesController', () => {
 			name: 'Tesla, Inc.',
 			lastAnalysedAt: '2026-05-01T12:00:00.000Z',
 			jobStatus: 'COMPLETED',
+			latestJobId: 'job-1',
 		};
 		companiesService.getSummary.mockResolvedValue(summary);
 
