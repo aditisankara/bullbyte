@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AnalyzeResponse, CompanySummary } from './company.models';
+import { ClaimListResponse } from './claim.models';
 
 /**
  * Typed client for the company endpoints (5.1 + 5.4). Raw error bodies never
@@ -25,6 +26,13 @@ export class CompanyApiService {
   getSummary(ticker: string): Observable<CompanySummary> {
     return this.http.get<CompanySummary>(
       `${this.base}/${encodeURIComponent(ticker)}`,
+    );
+  }
+
+  /** Claims timeline for a ticker — up to 8 quarters (FR31, Story 5.5). */
+  getClaims(ticker: string): Observable<ClaimListResponse> {
+    return this.http.get<ClaimListResponse>(
+      `${this.base}/${encodeURIComponent(ticker)}/claims`,
     );
   }
 }

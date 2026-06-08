@@ -6,6 +6,7 @@ import {
 } from '@angular/common/http/testing';
 import { CompanyApiService } from './company-api.service';
 import { AnalyzeResponse, CompanySummary } from './company.models';
+import { ClaimListResponse } from './claim.models';
 import { environment } from '../../../environments/environment';
 
 describe('CompanyApiService', () => {
@@ -52,5 +53,20 @@ describe('CompanyApiService', () => {
     req.flush(summary);
 
     expect(response).toEqual(summary);
+  });
+
+  it('GETs /companies/:ticker/claims and returns the claims envelope', () => {
+    const payload: ClaimListResponse = {
+      data: [],
+      meta: { total: 0, page: 1, pageSize: 20 },
+    };
+    let response: ClaimListResponse | undefined;
+    service.getClaims('TSLA').subscribe((r) => (response = r));
+
+    const req = http.expectOne(`${environment.apiBaseUrl}/companies/TSLA/claims`);
+    expect(req.request.method).toBe('GET');
+    req.flush(payload);
+
+    expect(response).toEqual(payload);
   });
 });
