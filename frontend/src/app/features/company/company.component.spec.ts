@@ -59,6 +59,17 @@ function claim(overrides: Partial<ClaimListItem> = {}): ClaimListItem {
 function claimsPayload(data: ClaimListItem[] = []): ClaimListResponse {
   return { data, meta: { total: data.length, page: 1, pageSize: 20 } };
 }
+/** The score slot's 6.4 card fetches the score whenever the dashboard renders. */
+const NO_SCORE = {
+  ticker: 'TSLA',
+  score: null,
+  deliveredCount: 0,
+  missedCount: 0,
+  totalResolved: 0,
+  pendingCount: 0,
+  insufficientDataCount: 0,
+  context: 'No resolved claims yet',
+};
 
 describe('CompanyComponent', () => {
   let http: HttpTestingController;
@@ -123,11 +134,13 @@ describe('CompanyComponent', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelectorAll('h1').length).toBe(1);
     expect(el.querySelector('app-company-page-layout')).not.toBeNull();
+    // The score slot now hosts the live 6.4 card (its own h2); the other three
+    // slots keep their pending placeholders until 6.3/6.5/6.6 wire them.
     const headings = Array.from(el.querySelectorAll('h2')).map(
       (h) => h.textContent?.trim(),
     );
     expect(headings).toEqual([
-      'CEO delivery score',
+      'CEO Delivery Score',
       'Promise timeline',
       'Claims',
       'Claim detail',

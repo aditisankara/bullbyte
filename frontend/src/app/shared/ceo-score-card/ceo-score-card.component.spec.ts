@@ -19,18 +19,26 @@ describe('CeoScoreCardComponent', () => {
     }).compileComponents();
   });
 
-  function render(score: CeoScore | null = SCORE) {
+  function render(
+    score: CeoScore | null = SCORE,
+    inputs: Record<string, unknown> = {},
+  ) {
     const fixture = TestBed.createComponent(CeoScoreCardComponent);
     fixture.componentRef.setInput('score', score);
+    for (const [key, value] of Object.entries(inputs)) {
+      fixture.componentRef.setInput(key, value);
+    }
     fixture.detectChanges();
     return fixture;
   }
 
-  it('shows the score and an accessible ring label', () => {
+  it('shows the score value inside an accessible heading (AC3)', () => {
     const el = render().nativeElement as HTMLElement;
     expect(el.querySelector('.score__num')?.textContent?.trim()).toBe('8.4');
-    expect(el.querySelector('.score__ring')?.getAttribute('aria-label')).toBe(
-      'CEO delivery score 8.4 out of 10',
+    const heading = el.querySelector('h2.score__ring-num');
+    expect(heading).not.toBeNull();
+    expect(heading?.getAttribute('aria-label')).toBe(
+      'CEO Delivery Score 8.4 out of 10',
     );
   });
 
@@ -87,5 +95,42 @@ describe('CeoScoreCardComponent', () => {
     const offset = Number(arc.getAttribute('stroke-dashoffset'));
     // 8.4/10 filled → offset is 16% of the circumference
     expect(offset / circumference).toBeCloseTo(0.16, 2);
+  });
+
+  // Opt-in inputs added for 6.4 — defaults preserve the behaviour above.
+
+  it('renders an authoritative context override verbatim (6.4)', () => {
+    const el = render(SCORE, {
+      contextOverride: '3 of 5 resolved promises delivered — 4 pending',
+    }).nativeElement as HTMLElement;
+    const context = el.querySelector('.score__context');
+    expect(context?.textContent).toContain(
+      '3 of 5 resolved promises delivered — 4 pending',
+    );
+    // The self-computed "last N quarters" sentence is not used.
+    expect(context?.textContent).not.toContain('last 8 quarters');
+    expect(context?.getAttribute('aria-label')).toBe(
+      '3 of 5 resolved promises delivered — 4 pending',
+    );
+  });
+
+  it('omits the CEO attribution when no name is supplied (6.4)', () => {
+    const el = render({ ...SCORE, ceo: '', company: undefined })
+      .nativeElement as HTMLElement;
+    expect(el.querySelector('.score__context strong')).toBeNull();
+  });
+
+  it('suppresses the trend indicator when showTrend is false (6.4)', () => {
+    const el = render(SCORE, { showTrend: false }).nativeElement as HTMLElement;
+    expect(el.querySelector('.score__trend')).toBeNull();
+  });
+
+  it('drops the Revised stat when showRevised is false (6.4)', () => {
+    const el = render(SCORE, { showRevised: false }).nativeElement as HTMLElement;
+    const labels = Array.from(el.querySelectorAll('.score__stat-label')).map((n) =>
+      n.textContent?.trim(),
+    );
+    expect(labels).not.toContain('Revised');
+    expect(labels).toContain('Pending');
   });
 });

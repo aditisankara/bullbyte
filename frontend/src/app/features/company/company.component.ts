@@ -50,6 +50,7 @@ import {
     PromiseTimelineComponent,
     ClaimCardComponent,
     AnalysisProgressComponent,
+    ScoreCardComponent,
   ],
   template: `
     @switch (state()) {
@@ -101,8 +102,8 @@ import {
         } @else {
           <app-company-page-layout>
             <section score>
-              <h2 class="pending__heading">CEO delivery score</h2>
-              <p class="pending__body">The score appears once analysis completes.</p>
+              <!-- 6.4: the CEO Delivery Score card fetches the score itself. -->
+              <app-score-card [ticker]="normalisedTicker()" />
             </section>
 
             <!-- 6.3: promise timeline — full-width, oldest-first; selecting a

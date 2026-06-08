@@ -7,6 +7,7 @@ import {
 import { CompanyApiService } from './company-api.service';
 import { AnalyzeResponse, CompanySummary } from './company.models';
 import { ClaimListResponse } from './claim.models';
+import { AnalyzeResponse, CeoScoreDto, CompanySummary } from './company.models';
 import { environment } from '../../../environments/environment';
 
 describe('CompanyApiService', () => {
