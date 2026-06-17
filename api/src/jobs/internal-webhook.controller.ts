@@ -13,6 +13,7 @@ import type { LoggerService } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { InternalWebhookGuard } from '../common/guards/internal-webhook.guard';
 import { ProgressService } from './progress.service';
+import { JobsService } from './jobs.service';
 import { ProgressWebhookDto } from './dto/progress-webhook.dto';
 
 /**
@@ -28,6 +29,7 @@ import { ProgressWebhookDto } from './dto/progress-webhook.dto';
 export class InternalWebhookController {
 	constructor(
 		private readonly progress: ProgressService,
+		private readonly jobs: JobsService,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService
 	) {}
@@ -39,14 +41,23 @@ export class InternalWebhookController {
 	 */
 	@Post(':jobId/progress')
 	@HttpCode(HttpStatus.ACCEPTED)
-	relay(
+	async relay(
 		@Param('jobId') jobId: string,
 		@Body() event: ProgressWebhookDto
-	): void {
+	): Promise<void> {
 		if (event.jobId !== jobId) {
 			throw new BadRequestException(
 				'jobId in path does not match jobId in body'
 			);
+		}
+
+		// Persist terminal status BEFORE broadcasting so that any SSE reconnect
+		// that fires after the browser receives the terminal event will see the
+		// correct DB state in terminalSnapshot() and won't hang on an empty Subject.
+		if (event.event === 'analysis-complete') {
+			await this.jobs.markCompleted(jobId);
+		} else if (event.event === 'analysis-failed') {
+			await this.jobs.markFailed(jobId);
 		}
 
 		// Relayed untouched (AC2: no transformation).

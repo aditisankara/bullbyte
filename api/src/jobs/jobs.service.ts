@@ -89,6 +89,11 @@ export class JobsService {
 		return this.setStatus(jobId, 'RUNNING');
 	}
 
+	/** Called by the internal webhook when FastAPI sends analysis-complete. */
+	markCompleted(jobId: string): Promise<void> {
+		return this.setStatus(jobId, 'COMPLETED');
+	}
+
 	/**
 	 * AC4: sidecar failed. NOTE: `analysis_jobs` has no error column (schema locked,
 	 * SP1) — the error reason is carried in the structured log emitted by the

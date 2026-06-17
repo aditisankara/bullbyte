@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
@@ -18,7 +18,11 @@ from src.db.queries import (
 )
 from src.models.progress_models import ProgressEvent
 from src.services.extraction_service import extract_claims
+from src.services.ingestion_service import ingest_8k_transcripts
 from src.services.verification_service import verify_claim
+
+# 8 quarters of earnings calls
+_INGEST_LOOKBACK_DAYS = 730
 
 router = APIRouter()
 logger = get_logger("ml-sidecar.analysis_router")
@@ -64,6 +68,33 @@ async def _do_extraction(ticker: str, job_id: str) -> None:
             )
         )
         return
+
+    # Ingest transcripts from EDGAR before extraction so a fresh DB is populated.
+    # ingest_8k_transcripts is idempotent — cached (ticker, quarter) rows are skipped.
+    end_date = datetime.now(timezone.utc).date()
+    start_date = end_date - timedelta(days=_INGEST_LOOKBACK_DAYS)
+    await emit_progress(
+        ProgressEvent(
+            event="transcript-fetched",
+            jobId=job_id,
+            stepIndex=0,
+            totalSteps=1,
+            message=f"Fetching EDGAR transcripts for {ticker}…",
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+    )
+    summary = await ingest_8k_transcripts(
+        ticker, start_date.isoformat(), end_date.isoformat()
+    )
+    logger.info(
+        "Ingestion complete before extraction",
+        extra={
+            "ticker": ticker,
+            "jobId": job_id,
+            "transcripts": summary.transcripts_extracted,
+            "press_releases": summary.press_releases_extracted,
+        },
+    )
 
     transcripts = await get_all_transcripts_for_ticker(ticker)
     if not transcripts:
@@ -199,24 +230,17 @@ async def analyze_ticker(
 ) -> JSONResponse:
     upper = ticker.upper()
 
-    # Pre-flight: verify company exists before dispatching to background
+    # Pre-flight: verify company exists before dispatching to background.
+    # Transcript ingestion is handled inside _do_extraction (chained automatically).
     company_id = await get_company_id_by_ticker(upper)
     if company_id is None:
         raise HTTPException(
             status_code=404,
-            detail=f"Company '{upper}' not found. Add it to the companies table and run ingestion first.",
-        )
-
-    # Pre-flight: verify at least one usable transcript exists
-    transcripts = await get_all_transcripts_for_ticker(upper)
-    if not transcripts:
-        raise HTTPException(
-            status_code=422,
-            detail=f"No ingested transcripts found for '{upper}' (status SUCCESS or PRESS_RELEASE). Run ingestion first.",
+            detail=f"Company '{upper}' not found. Ensure it was created via the NestJS analyze endpoint first.",
         )
 
     background_tasks.add_task(_run_extraction, upper, body.jobId)
     return JSONResponse(
         status_code=202,
-        content={"jobId": body.jobId, "status": "QUEUED", "transcriptCount": len(transcripts)},
+        content={"jobId": body.jobId, "status": "QUEUED"},
     )
