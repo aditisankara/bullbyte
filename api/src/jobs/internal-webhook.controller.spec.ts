@@ -16,13 +16,16 @@ function makeDto(jobId = 'job-1'): ProgressWebhookDto {
 describe('InternalWebhookController', () => {
 	let controller: InternalWebhookController;
 	let progress: { publish: jest.Mock };
+	let jobs: { markCompleted: jest.Mock; markFailed: jest.Mock };
 	let logger: { log: jest.Mock };
 
 	beforeEach(() => {
 		progress = { publish: jest.fn() };
+		jobs = { markCompleted: jest.fn().mockResolvedValue(undefined), markFailed: jest.fn().mockResolvedValue(undefined) };
 		logger = { log: jest.fn() };
 		controller = new InternalWebhookController(
 			progress as any,
+			jobs as any,
 			logger as any
 		);
 	});
