@@ -56,10 +56,10 @@ describe('InternalWebhookController', () => {
 		);
 	});
 
-	it('rejects a path/body jobId mismatch and does not publish', () => {
+	it('rejects a path/body jobId mismatch and does not publish', async () => {
 		const dto = makeDto('body-job');
 
-		expect(() => controller.relay('path-job', dto)).toThrow(
+		await expect(controller.relay('path-job', dto)).rejects.toThrow(
 			BadRequestException
 		);
 		expect(progress.publish).not.toHaveBeenCalled();
