@@ -24,6 +24,7 @@ import { MlSidecarService } from './common/ml-sidecar.service';
 	imports: [
 		ConfigModule.forRoot({
 			isGlobal: true,
+			envFilePath: '.env',
 			validationSchema: appValidationSchema,
 		}),
 		WinstonModule.forRootAsync({

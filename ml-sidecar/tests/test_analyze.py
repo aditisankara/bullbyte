@@ -41,7 +41,6 @@ def test_analyze_returns_queued_payload(client):
     data = response.json()
     assert data["jobId"] == "test-job-2"
     assert data["status"] == "QUEUED"
-    assert data["transcriptCount"] == len(_MOCK_TRANSCRIPTS)
 
 
 def test_analyze_accepts_any_ticker(client):
@@ -67,14 +66,14 @@ def test_analyze_returns_404_when_company_not_found(client):
     assert response.status_code == 404
 
 
-def test_analyze_returns_422_when_no_transcripts(client):
-    """Synchronous 422 when the company exists but no usable transcripts are ingested."""
+def test_analyze_dispatches_when_no_transcripts_yet(client):
+    """202 is returned even with no pre-ingested transcripts — ingestion is chained inside the background task."""
     with (
         patch(_PATCH_COMPANY, AsyncMock(return_value=_MOCK_COMPANY_ID)),
-        patch(_PATCH_TRANSCRIPTS, AsyncMock(return_value=[])),
+        patch(_PATCH_RUN, AsyncMock()),
     ):
-        response = client.post("/analyze/NOTINGESTED", json={"jobId": "job-422"})
-    assert response.status_code == 422
+        response = client.post("/analyze/NOTINGESTED", json={"jobId": "job-no-transcripts"})
+    assert response.status_code == 202
 
 
 # ---------------------------------------------------------------------------
