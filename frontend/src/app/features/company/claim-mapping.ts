@@ -69,6 +69,35 @@ function confidenceOf(item: ClaimListItem): number {
   return item.verdict?.confidenceScore ?? item.extractionConfidence;
 }
 
+/** Only unresolved claims carry a note; a delivered/missed card needs none. */
+function noteOf(item: ClaimListItem): string | undefined {
+  const type = item.verdict?.verdictType;
+  if (type === undefined || type === 'INSUFFICIENT_DATA') {
+    return item.statusNote ?? undefined;
+  }
+  return undefined;
+}
+
+/**
+ * The sidecar stores `actual - target` as a raw float string ("0.6200000000000045",
+ * "-287000000.0"). Show it signed and compact: "+0.62", "−$287M".
+ */
+export function formatDelta(raw: string | null | undefined): string | undefined {
+  if (raw === null || raw === undefined || raw === '') return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return raw;
+  const sign = n > 0 ? '+' : n < 0 ? '−' : '';
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return `${sign}$${trim(abs / 1e9)}B`;
+  if (abs >= 1e6) return `${sign}$${trim(abs / 1e6)}M`;
+  if (abs >= 1e4) return `${sign}$${trim(abs / 1e3)}K`;
+  return `${sign}${trim(abs)}`;
+}
+
+function trim(n: number): string {
+  return String(Number(n.toFixed(2)));
+}
+
 /** Map one API claim to the card's presentation model. */
 export function toClaimSummary(item: ClaimListItem): ClaimSummary {
   return {
@@ -76,10 +105,13 @@ export function toClaimSummary(item: ClaimListItem): ClaimSummary {
     quarter: displayQuarter(item.quarter),
     metric: item.metric,
     quote: item.rawQuote,
-    speaker: item.speaker ?? 'Unknown speaker',
+    // Most claims come from press releases / shareholder letters, which have no
+    // named speaker — attribute them to the company rather than "Unknown".
+    speaker: item.speaker ?? 'Company guidance',
     verdict: verdictOf(item),
-    delta: item.verdict?.delta ?? undefined,
+    delta: formatDelta(item.verdict?.delta),
     confidence: confidenceOf(item),
+    note: noteOf(item),
   };
 }
 

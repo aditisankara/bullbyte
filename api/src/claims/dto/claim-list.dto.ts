@@ -11,6 +11,8 @@ export interface ClaimListItemDto {
 	targetUnit: string | null;
 	extractionConfidence: number; // numeric(4,3) parsed to number
 	verdict: ClaimVerdictDto | null; // null while the claim is pending
+	/** Why the claim is pending / unverifiable, in plain words; null otherwise. */
+	statusNote: string | null;
 }
 
 export interface ClaimListMetaDto {

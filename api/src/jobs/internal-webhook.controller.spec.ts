@@ -16,13 +16,16 @@ function makeDto(jobId = 'job-1'): ProgressWebhookDto {
 describe('InternalWebhookController', () => {
 	let controller: InternalWebhookController;
 	let progress: { publish: jest.Mock };
+	let jobs: { markCompleted: jest.Mock; markFailed: jest.Mock };
 	let logger: { log: jest.Mock };
 
 	beforeEach(() => {
 		progress = { publish: jest.fn() };
+		jobs = { markCompleted: jest.fn().mockResolvedValue(undefined), markFailed: jest.fn().mockResolvedValue(undefined) };
 		logger = { log: jest.fn() };
 		controller = new InternalWebhookController(
 			progress as any,
+			jobs as any,
 			logger as any
 		);
 	});
@@ -53,10 +56,10 @@ describe('InternalWebhookController', () => {
 		);
 	});
 
-	it('rejects a path/body jobId mismatch and does not publish', () => {
+	it('rejects a path/body jobId mismatch and does not publish', async () => {
 		const dto = makeDto('body-job');
 
-		expect(() => controller.relay('path-job', dto)).toThrow(
+		await expect(controller.relay('path-job', dto)).rejects.toThrow(
 			BadRequestException
 		);
 		expect(progress.publish).not.toHaveBeenCalled();

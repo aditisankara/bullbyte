@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
+import { forkJoin, map, of, switchMap } from 'rxjs';
 import { CompanyApiService } from '../../core/api/company-api.service';
 import { CompanySummary, LoadState } from '../../core/api/company.models';
 import { ClaimListItem } from '../../core/api/claim.models';
@@ -135,7 +136,11 @@ import {
                 }
                 @case ('success') {
                   @if (visibleClaims().length === 0) {
-                    <p class="claims__status">No claims yet.</p>
+                    <p class="claims__status">
+                      No quantifiable forward-looking guidance was found in
+                      {{ normalisedTicker() }}'s public SEC filings, so there is
+                      nothing to verify yet.
+                    </p>
                   } @else {
                     <ul class="claims__list">
                       @for (c of visibleClaims(); track c.id) {
@@ -328,7 +333,7 @@ export class CompanyComponent {
     });
   }
 
-  protected load(): void {
+  protected load(autoAnalyse = true): void {
     this.state.set('loading');
     this.api.getSummary(this.normalisedTicker()).subscribe({
       next: (summary) => {
@@ -340,6 +345,14 @@ export class CompanyComponent {
         }
       },
       error: (err: ApiError) => {
+        // A direct / shared URL for a ticker we have never analysed: start the
+        // analysis instead of claiming EDGAR has no filings. The analyze endpoint
+        // validates the symbol, so a genuinely bad ticker still lands on the
+        // not-found state below.
+        if (err.status === 404 && autoAnalyse) {
+          this.startAnalysisFor404();
+          return;
+        }
         this.errorKind.set(
           err.status === 404 ? 'ticker-not-found' : 'edgar-unavailable',
         );
@@ -348,15 +361,49 @@ export class CompanyComponent {
     });
   }
 
+  private startAnalysisFor404(): void {
+    this.api.analyze(this.normalisedTicker()).subscribe({
+      next: () => this.load(false),
+      error: (err: ApiError) => {
+        this.errorKind.set(
+          err.status === 400 || err.status === 404
+            ? 'ticker-not-found'
+            : 'edgar-unavailable',
+        );
+        this.state.set('error');
+      },
+    });
+  }
+
+  /** Fetches every page of the claims endpoint — the summary counts are
+   *  computed over the full claim set, so the visible list must match (the
+   *  API paginates at 20/page, well below realistic claim counts). */
   protected loadClaims(): void {
     this.claimsState.set('loading');
-    this.api.getClaims(this.normalisedTicker()).subscribe({
-      next: (res) => {
-        this.claims.set(res.data);
-        this.claimsState.set('success');
-      },
-      error: () => this.claimsState.set('error'),
-    });
+    const ticker = this.normalisedTicker();
+    this.api
+      .getClaims(ticker, 1)
+      .pipe(
+        switchMap((first) => {
+          const totalPages = Math.max(1, Math.ceil(first.meta.total / first.meta.pageSize));
+          if (totalPages <= 1) {
+            return of(first.data);
+          }
+          const rest = Array.from({ length: totalPages - 1 }, (_, i) =>
+            this.api.getClaims(ticker, i + 2),
+          );
+          return forkJoin(rest).pipe(
+            map((pages) => [...first.data, ...pages.flatMap((p) => p.data)]),
+          );
+        }),
+      )
+      .subscribe({
+        next: (data) => {
+          this.claims.set(data);
+          this.claimsState.set('success');
+        },
+        error: () => this.claimsState.set('error'),
+      });
   }
 
   /**

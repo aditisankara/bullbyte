@@ -42,11 +42,17 @@ def _extract_yfinance_metrics(
     quarter: str,
     df: "pd.DataFrame",
     metrics_needed: list[str],
+    target_date: datetime.date | None = None,
 ) -> list[FinancialMetric]:
-    """Extract FinancialMetric objects from a yfinance quarterly_income_stmt DataFrame."""
+    """Extract FinancialMetric objects from a yfinance quarterly_income_stmt DataFrame.
+
+    `target_date` is the expected fiscal quarter-end; callers pass the real
+    fiscal date so off-calendar filers aren't matched to a column a year off.
+    Falls back to the calendar quarter-end when not supplied.
+    """
     import math
 
-    target = _quarter_to_period_end_date(quarter)
+    target = target_date or _quarter_to_period_end_date(quarter)
     tolerance = datetime.timedelta(days=45)
 
     # Find the best matching column
@@ -97,8 +103,12 @@ async def supplement_with_yfinance(
     ticker: str,
     quarter: str,
     metrics_needed: list[str],
+    target_date: datetime.date | None = None,
 ) -> list[FinancialMetric]:
     """Fetch yfinance quarterly data and return FinancialMetric list for requested metrics.
+
+    `target_date` is the expected fiscal quarter-end used to pick the right
+    column; when omitted the calendar quarter-end is used.
 
     Never raises — returns [] on any failure.
     """
@@ -117,7 +127,7 @@ async def supplement_with_yfinance(
             import yfinance as yf
             ticker_obj = yf.Ticker(ticker)
             df = ticker_obj.quarterly_income_stmt
-            return _extract_yfinance_metrics(ticker, quarter, df, metrics_needed)
+            return _extract_yfinance_metrics(ticker, quarter, df, metrics_needed, target_date)
 
         results: list[FinancialMetric] = await loop.run_in_executor(None, _sync_fetch)
         logger.info(

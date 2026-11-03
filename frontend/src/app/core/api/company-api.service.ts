@@ -29,10 +29,11 @@ export class CompanyApiService {
     );
   }
 
-  /** Claims timeline for a ticker — up to 8 quarters (FR31, Story 5.5). */
-  getClaims(ticker: string): Observable<ClaimListResponse> {
+  /** Claims timeline for a ticker — up to 8 quarters (FR31, Story 5.5). Paginated by the API. */
+  getClaims(ticker: string, page = 1): Observable<ClaimListResponse> {
     return this.http.get<ClaimListResponse>(
       `${this.base}/${encodeURIComponent(ticker)}/claims`,
+      { params: { page } },
     );
   }
 

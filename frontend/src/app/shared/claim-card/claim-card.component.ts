@@ -40,6 +40,10 @@ import { ConfidenceIndicatorComponent } from '../confidence-indicator/confidence
 
       <p class="card__quote">“{{ claim().quote }}”</p>
 
+      @if (claim().note; as note) {
+        <p class="card__note">{{ note }}</p>
+      }
+
       <div class="card__foot">
         <span class="card__speaker">{{ claim().speaker }}</span>
         @if (claim().delta) {
@@ -69,6 +73,12 @@ import { ConfidenceIndicatorComponent } from '../confidence-indicator/confidence
       border-color: var(--ink);
       outline: 2px solid var(--gold);
       outline-offset: 2px;
+    }
+    .card__note {
+      margin: 0;
+      font-size: var(--text-sm, 0.875rem);
+      color: var(--ink-muted, var(--ink));
+      font-style: italic;
     }
     .card--selected {
       background: var(--ink-tint-5);

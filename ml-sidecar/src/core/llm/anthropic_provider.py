@@ -16,11 +16,14 @@ from anthropic import AsyncAnthropic
 from .base import BaseLLMProvider, LLMResponse
 
 _DEFAULT_MODEL = "claude-opus-4-5"
+# Without this, the SDK's own default (10 min) leaves a hung call silently
+# blocking a whole analysis job with no log line until it finally times out.
+_REQUEST_TIMEOUT_SECONDS = 60.0
 
 
 class AnthropicProvider(BaseLLMProvider):
     def __init__(self, api_key: str, model: str = _DEFAULT_MODEL) -> None:
-        self._client = AsyncAnthropic(api_key=api_key)
+        self._client = AsyncAnthropic(api_key=api_key, timeout=_REQUEST_TIMEOUT_SECONDS)
         self._model = model
 
     async def complete(

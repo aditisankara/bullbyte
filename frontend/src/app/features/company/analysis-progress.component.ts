@@ -109,7 +109,7 @@ export class AnalysisProgressComponent {
     this.retryUnavailable.set(false);
     this.api.analyze(this.ticker()).subscribe({
       next: (response) => {
-        if (response.status === 'QUEUED') {
+        if (response.status === 'QUEUED' || response.status === 'RUNNING') {
           this.retryJobId.set(response.jobId);
           this.attempt.update((n) => n + 1);
         } else {

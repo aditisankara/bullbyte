@@ -6,6 +6,7 @@ import pytest
 
 import src.services.ingestion_service as ingestion_svc
 from src.core.edgar_models import EdgarFetchError
+from src.models.financials_models import FinancialMetric
 from src.services.financials_service import (
     _extract_xbrl_metrics,
     _find_filing_accession,
@@ -314,6 +315,51 @@ def test_extract_xbrl_metrics_period_end_tolerance_45_days():
     assert revenue.value == "12345678"
 
 
+def test_extract_xbrl_metrics_10k_separates_quarterly_from_annual_revenue():
+    """A 10-K's XBRL facts carry both the standalone Q4 figure (fp=="Q4") and
+    the full fiscal year total (fp=="FY") for the same concept. Both must be
+    extracted and tagged, not just the annual one — matching a single-quarter
+    claim against the FY total was the exact bug reported against NVDA."""
+    xbrl = {
+        "facts": {
+            "us-gaap": {
+                "Revenues": {
+                    "units": {
+                        "USD": [
+                            {
+                                "end": "2025-12-31",
+                                "val": 37500000000,  # standalone Q4
+                                "form": "10-K",
+                                "fp": "Q4",
+                                "fy": 2025,
+                                "filed": "2026-02-20",
+                                "accn": "0001-26-000021",
+                            },
+                            {
+                                "end": "2025-12-31",
+                                "val": 130497000000,  # full fiscal year
+                                "form": "10-K",
+                                "fp": "FY",
+                                "fy": 2025,
+                                "filed": "2026-02-20",
+                                "accn": "0001-26-000021",
+                            },
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    metrics = _extract_xbrl_metrics(xbrl, "NVDA", "Q4-2025", "10-K", "https://sec.gov/test")
+    revenues = [m for m in metrics if m.metric_name == "revenue"]
+    assert {m.period for m in revenues} == {"quarterly", "annual"}
+
+    quarterly = next(m for m in revenues if m.period == "quarterly")
+    annual = next(m for m in revenues if m.period == "annual")
+    assert quarterly.value == "37500000000"
+    assert annual.value == "130497000000"
+
+
 # ── Task 8 tests: _find_filing_accession ─────────────────────────────────────
 
 async def test_find_filing_accession_returns_correct_accession(mock_client):
@@ -383,6 +429,73 @@ async def test_ingest_financial_actuals_returns_metrics_on_success(mock_client, 
     assert len(result.metrics) > 0
     metric_names = [m.metric_name for m in result.metrics]
     assert "revenue" in metric_names
+
+
+async def test_ingest_financial_actuals_10k_supplements_missing_quarterly_via_yfinance(
+    mock_client, mock_ingestion_client
+):
+    """A 10-K with only the [annual] XBRL revenue fact (NVIDIA's actual shape) must
+    still request the quarterly figure from yfinance — the [annual] entry alone
+    must not be mistaken for satisfying the quarterly gap (the exact bug that
+    caused a Q4 claim to be silently matched against the full fiscal year)."""
+    xbrl_annual_only = {
+        "facts": {
+            "us-gaap": {
+                "Revenues": {
+                    "units": {
+                        "USD": [
+                            {
+                                "end": "2024-12-31",
+                                "val": 130497000000,
+                                "form": "10-K",
+                                "fp": "FY",
+                                "fy": 2024,
+                                "filed": "2025-02-20",
+                                "accn": "0001-25-000021",
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    submissions_10k = {
+        "cik": "1318605",
+        "filings": {
+            "recent": {
+                "accessionNumber": ["0001318605-25-000021"],
+                "filingDate": ["2025-02-20"],
+                "form": ["10-K"],
+            },
+            "files": [],
+        },
+    }
+    mock_ingestion_client.fetch.return_value = httpx.Response(200, json=_TICKERS_JSON)
+    mock_client.fetch.side_effect = [
+        httpx.Response(200, json=submissions_10k),
+        httpx.Response(200, json=xbrl_annual_only),
+        EdgarFetchError(ticker="TSLA", filing_type="filing-index", url="https://x", final_status=404),
+    ]
+    with patch("src.services.financials_service.supplement_with_yfinance") as mock_yf:
+        mock_yf.return_value = [
+            FinancialMetric(
+                ticker="TSLA", quarter="Q4-2024", metric_name="revenue", value="37500000000",
+                unit="USD", section_reference="yfinance/Total Revenue", filing_url="",
+                filing_type="yfinance", parse_status="SUCCESS", source="yfinance",
+            )
+        ]
+        result = await ingest_financial_actuals("TSLA", "Q4-2024")
+
+        # yfinance was asked to fill the missing quarterly revenue
+        assert "revenue" in mock_yf.call_args.args[2]
+
+    revenues = [m for m in result.metrics if m.metric_name == "revenue"]
+    assert {m.period for m in revenues} == {"quarterly", "annual"}
+    quarterly = next(m for m in revenues if m.period == "quarterly")
+    annual = next(m for m in revenues if m.period == "annual")
+    assert quarterly.value == "37500000000"
+    assert quarterly.source == "yfinance"
+    assert annual.value == "130497000000"
 
 
 async def test_ingest_financial_actuals_guidance_failure_does_not_prevent_success(mock_client, mock_ingestion_client):

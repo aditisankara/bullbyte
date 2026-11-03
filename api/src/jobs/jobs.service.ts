@@ -9,6 +9,12 @@ import { AnalyzeResponseDto, JobStatus } from './dto/analyze-response.dto';
 
 export const ANALYSIS_QUEUE = 'analysis';
 
+/** A COMPLETED analysis is served from cache for this long before it is refreshed. */
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** A QUEUED/RUNNING job older than this is treated as orphaned. */
+const STALE_JOB_MS = 20 * 60 * 1000;
+
 export interface AnalysisJobData {
 	jobId: string;
 	ticker: string;
@@ -22,12 +28,31 @@ export class JobsService {
 		private readonly queue: Queue<AnalysisJobData>
 	) {}
 
-	/** AC1/AC3: cache hit short-circuits; otherwise create QUEUED job + enqueue. */
+	/**
+	 * AC1/AC3: cache hit short-circuits. A job already QUEUED/RUNNING for this
+	 * ticker is returned as-is rather than spawning a duplicate — without this,
+	 * a retriggered analyze (retry button, repeated search) piles a second
+	 * extraction run on top of the first and writes duplicate claims.
+	 */
 	async requestAnalysis(ticker: string): Promise<AnalyzeResponseDto> {
 		const companyId = await this.ensureCompany(ticker);
 
-		if (await this.isCached(companyId)) {
+		const latest = await this.latestJob(companyId);
+		if (
+			latest?.status === 'COMPLETED' &&
+			Date.now() - latest.createdAt.getTime() < CACHE_TTL_MS
+		) {
 			return { jobId: null, status: 'COMPLETED', cached: true };
+		}
+		// An older COMPLETED job falls through to a fresh run: claims that were
+		// PENDING (filing not yet published) get re-verified, and new filings are picked up.
+		if (latest?.status === 'QUEUED' || latest?.status === 'RUNNING') {
+			if (Date.now() - latest.createdAt.getTime() < STALE_JOB_MS) {
+				return { jobId: latest.id, status: latest.status };
+			}
+			// Orphaned run (lost terminal webhook, sidecar restart): fail it so the
+			// ticker can be re-analysed instead of showing "in progress" forever.
+			await this.markFailed(latest.id);
 		}
 
 		// Persist the job row first so its id is the source of truth, then enqueue
@@ -70,23 +95,42 @@ export class JobsService {
 		return row.id;
 	}
 
-	/**
-	 * Phase 1 cache definition: the company's most recent job is COMPLETED.
-	 * TODO(3.6/5.5): tighten to "transcripts + verdicts present for requested quarters".
-	 */
-	private async isCached(companyId: string): Promise<boolean> {
+	/** The company's most recent job, if any. */
+	private async latestJob(
+		companyId: string
+	): Promise<{ id: string; status: JobStatus; createdAt: Date } | undefined> {
 		const [latest] = await this.db
-			.select({ status: analysisJobs.status })
+			.select({
+				id: analysisJobs.id,
+				status: analysisJobs.status,
+				createdAt: analysisJobs.createdAt,
+			})
 			.from(analysisJobs)
 			.where(eq(analysisJobs.companyId, companyId))
 			.orderBy(desc(analysisJobs.createdAt))
 			.limit(1);
-		return latest?.status === 'COMPLETED';
+		return latest;
 	}
 
 	/** AC2: worker dispatched the run to the sidecar. */
 	markRunning(jobId: string): Promise<void> {
 		return this.setStatus(jobId, 'RUNNING');
+	}
+
+	/** Called by the internal webhook when FastAPI sends analysis-complete. */
+	async markCompleted(jobId: string): Promise<void> {
+		await this.setStatus(jobId, 'COMPLETED');
+		const [job] = await this.db
+			.select({ companyId: analysisJobs.companyId })
+			.from(analysisJobs)
+			.where(eq(analysisJobs.id, jobId))
+			.limit(1);
+		if (job) {
+			await this.db
+				.update(companies)
+				.set({ lastAnalysedAt: new Date() })
+				.where(eq(companies.id, job.companyId));
+		}
 	}
 
 	/**

@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
-VerdictType = Literal["DELIVERED", "MISSED", "INSUFFICIENT_DATA"]
+VerdictType = Literal["DELIVERED", "MISSED", "INSUFFICIENT_DATA", "PENDING"]
 
 
 class VerificationResult(BaseModel):

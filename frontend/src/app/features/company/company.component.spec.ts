@@ -105,7 +105,7 @@ describe('CompanyComponent', () => {
   /** Flush the claims request a completed-summary render fires (6.3). */
   function flushClaims(data: ClaimListItem[] = [], ticker = 'TSLA') {
     http
-      .expectOne(`${environment.apiBaseUrl}/companies/${ticker}/claims`)
+      .expectOne(`${environment.apiBaseUrl}/companies/${ticker}/claims?page=1`)
       .flush(claimsPayload(data));
   }
 
@@ -183,12 +183,39 @@ describe('CompanyComponent', () => {
         { statusCode: 404, error: 'NOT_FOUND', code: 'TICKER_NOT_FOUND' },
         { status: 404, statusText: 'Not Found' },
       );
+    // A never-analysed ticker kicks off analysis; an invalid one is rejected by it.
+    http
+      .expectOne(`${environment.apiBaseUrl}/companies/XYZ/analyze`)
+      .flush(
+        { statusCode: 400, error: 'BAD_REQUEST', code: 'INVALID_TICKER' },
+        { status: 400, statusText: 'Bad Request' },
+      );
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('app-error-state')).not.toBeNull();
     expect(el.textContent).toContain('No filings found');
     expect(el.textContent).not.toContain('TICKER_NOT_FOUND');
+  });
+
+  it('starts an analysis for a valid never-analysed ticker opened by direct URL', () => {
+    const fixture = render('NEWCO');
+    http
+      .expectOne(`${environment.apiBaseUrl}/companies/NEWCO`)
+      .flush(
+        { statusCode: 404, error: 'NOT_FOUND', code: 'TICKER_NOT_FOUND' },
+        { status: 404, statusText: 'Not Found' },
+      );
+    http
+      .expectOne(`${environment.apiBaseUrl}/companies/NEWCO/analyze`)
+      .flush({ jobId: 'job-1', status: 'QUEUED' });
+    // Summary is re-fetched once — and not analysed a second time if still absent.
+    http
+      .expectOne(`${environment.apiBaseUrl}/companies/NEWCO`)
+      .flush({ ...SUMMARY, ticker: 'NEWCO', jobStatus: 'QUEUED', latestJobId: 'job-1' });
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-analysis-progress')).not.toBeNull();
   });
 
   it('renders the live progress feed instead of the layout while a run is live (6.2 AC1)', () => {
@@ -278,7 +305,7 @@ describe('CompanyComponent', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.textContent).toContain('No claims yet');
+    expect(el.textContent).toContain('No quantifiable forward-looking guidance');
     expect(el.querySelector('app-claim-card')).toBeNull();
     expect(el.querySelector('[claims] app-error-state')).toBeNull();
   });
@@ -288,7 +315,7 @@ describe('CompanyComponent', () => {
     http.expectOne(`${environment.apiBaseUrl}/companies/TSLA`).flush(SUMMARY);
     fixture.detectChanges();
     http
-      .expectOne(`${environment.apiBaseUrl}/companies/TSLA/claims`)
+      .expectOne(`${environment.apiBaseUrl}/companies/TSLA/claims?page=1`)
       .flush(
         { statusCode: 503, error: 'UNAVAILABLE', code: 'EDGAR_UNAVAILABLE' },
         { status: 503, statusText: 'Service Unavailable' },
@@ -307,7 +334,7 @@ describe('CompanyComponent', () => {
     fixture.detectChanges();
 
     // No claims request is issued; afterEach http.verify() would fail otherwise.
-    http.expectNone(`${environment.apiBaseUrl}/companies/TSLA/claims`);
+    http.expectNone(`${environment.apiBaseUrl}/companies/TSLA/claims?page=1`);
     expect(
       (fixture.nativeElement as HTMLElement).querySelector('app-claim-card'),
     ).toBeNull();

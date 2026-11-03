@@ -9,9 +9,9 @@ Never raises — all error paths return an AlignmentDecision with appropriate st
 All EDGAR HTTP calls go through ``get_client()`` — never direct httpx calls.
 """
 import json
-from datetime import datetime, timedelta
 
 from src.core.edgar_client import EdgarFetchError, get_client
+from src.core.filing_selector import select_filing_entry
 from src.core.logging import get_logger
 from src.models.alignment_models import AlignmentDecision
 from src.services.ingestion_service import resolve_cik
@@ -62,8 +62,12 @@ def _quarter_to_filing_type(quarter: str) -> str:
 
 # ── EDGAR filing lookup ───────────────────────────────────────────────────────
 
-async def _find_filing_url(ticker: str, cik: str, quarter: str, filing_type: str) -> str | None:
-    """Return the EDGAR index URL for the earliest matching filing, or None."""
+async def _find_filing_entry(ticker: str, cik: str, quarter: str, filing_type: str) -> dict | None:
+    """Return the submissions entry of the filing that reports `quarter`, or None.
+
+    Matched on the filing's reportDate (see filing_selector), so off-calendar fiscal
+    years resolve to the right 10-Q/10-K instead of the next filing by date.
+    """
     url = f"https://data.sec.gov/submissions/CIK{cik}.json"
     response = await get_client().fetch(url, ticker=ticker, filing_type="submissions")
     try:
@@ -71,24 +75,20 @@ async def _find_filing_url(ticker: str, cik: str, quarter: str, filing_type: str
     except json.JSONDecodeError as exc:
         raise EdgarFetchError(ticker=ticker, filing_type="submissions", url=url, final_status=response.status_code) from exc
 
-    period_end_dt = datetime.strptime(_quarter_to_period_end(quarter), "%Y-%m-%d")
-    cutoff_dt = period_end_dt + timedelta(days=180)
-
-    matches: list[tuple[datetime, str]] = []
+    entries: list[dict] = []
 
     def _collect_from_recent(recent: dict) -> None:
         acc_numbers = recent.get("accessionNumber", [])
         filing_dates = recent.get("filingDate", [])
         forms = recent.get("form", [])
-        for acc_no, filing_date_str, form in zip(acc_numbers, filing_dates, forms):
-            if form != filing_type:
-                continue
-            try:
-                filing_dt = datetime.strptime(filing_date_str, "%Y-%m-%d")
-            except ValueError:
-                continue
-            if period_end_dt <= filing_dt <= cutoff_dt:
-                matches.append((filing_dt, acc_no))
+        report_dates = recent.get("reportDate", [])
+        for i, (acc_no, filing_date_str, form) in enumerate(zip(acc_numbers, filing_dates, forms)):
+            entries.append({
+                "accessionNumber": acc_no,
+                "filingDate": filing_date_str,
+                "form": form,
+                "reportDate": report_dates[i] if i < len(report_dates) else "",
+            })
 
     filings = payload.get("filings", {})
     _collect_from_recent(filings.get("recent", {}))
@@ -103,14 +103,19 @@ async def _find_filing_url(ticker: str, cik: str, quarter: str, filing_type: str
             raise EdgarFetchError(ticker=ticker, filing_type="submissions", url=page_url, final_status=page_resp.status_code) from exc
         _collect_from_recent(page_payload.get("recent", {}))
 
-    if not matches:
-        return None
+    return select_filing_entry(entries, quarter, filing_type)
 
-    matches.sort(key=lambda t: t[0])
-    _, acc_no = matches[0]
+
+def _filing_index_url(cik: str, accession_no: str) -> str:
     cik_int = str(int(cik))
-    acc_path = acc_no.replace("-", "")
-    return f"https://www.sec.gov/Archives/edgar/data/{cik_int}/{acc_path}/{acc_no}-index.htm"
+    acc_path = accession_no.replace("-", "")
+    return f"https://www.sec.gov/Archives/edgar/data/{cik_int}/{acc_path}/{accession_no}-index.htm"
+
+
+async def _find_filing_url(ticker: str, cik: str, quarter: str, filing_type: str) -> str | None:
+    """Return the EDGAR index URL for the filing that reports `quarter`, or None."""
+    entry = await _find_filing_entry(ticker, cik, quarter, filing_type)
+    return _filing_index_url(cik, entry["accessionNumber"]) if entry else None
 
 
 # ── Decision logger ───────────────────────────────────────────────────────────
@@ -170,7 +175,7 @@ async def align_call_to_actuals(ticker: str, call_quarter: str) -> AlignmentDeci
         return decision
 
     try:
-        filing_url = await _find_filing_url(ticker, cik, actuals_quarter, filing_type)
+        entry = await _find_filing_entry(ticker, cik, actuals_quarter, filing_type)
     except EdgarFetchError:
         decision = AlignmentDecision(
             ticker=ticker,
@@ -185,7 +190,11 @@ async def align_call_to_actuals(ticker: str, call_quarter: str) -> AlignmentDeci
         _log_decision(decision)
         return decision
 
-    if filing_url is not None:
+    if entry is not None:
+        # The form is whatever EDGAR says reported that period (a Dec quarter is a
+        # 10-K for Dec filers but a 10-Q for Jun/Sep filers), not a Q4 => 10-K guess.
+        filing_type = entry.get("form") or filing_type
+        filing_url = _filing_index_url(cik, entry["accessionNumber"])
         decision = AlignmentDecision(
             ticker=ticker,
             call_quarter=call_quarter,
@@ -204,7 +213,7 @@ async def align_call_to_actuals(ticker: str, call_quarter: str) -> AlignmentDeci
     alt_filing_type = _quarter_to_filing_type(alt_quarter)
 
     try:
-        alt_url = await _find_filing_url(ticker, cik, alt_quarter, alt_filing_type)
+        alt_entry = await _find_filing_entry(ticker, cik, alt_quarter, alt_filing_type)
     except EdgarFetchError:
         decision = AlignmentDecision(
             ticker=ticker,
@@ -219,7 +228,9 @@ async def align_call_to_actuals(ticker: str, call_quarter: str) -> AlignmentDeci
         _log_decision(decision)
         return decision
 
-    if alt_url is not None:
+    if alt_entry is not None:
+        alt_filing_type = alt_entry.get("form") or alt_filing_type
+        alt_url = _filing_index_url(cik, alt_entry["accessionNumber"])
         decision = AlignmentDecision(
             ticker=ticker,
             call_quarter=call_quarter,

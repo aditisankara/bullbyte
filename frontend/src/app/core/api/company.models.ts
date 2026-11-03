@@ -19,9 +19,10 @@ export interface CompanySummary {
   latestJobId: string | null; // id of the most recent analysis job, or null (6.2: SSE resume on direct load)
 }
 
+/** `RUNNING` covers reconnecting to a job already in flight. */
 export interface QueuedAnalyzeResponse {
   jobId: string;
-  status: 'QUEUED';
+  status: 'QUEUED' | 'RUNNING';
 }
 
 export interface CachedAnalyzeResponse {

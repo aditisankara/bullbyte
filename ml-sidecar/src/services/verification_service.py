@@ -38,10 +38,29 @@ You are a financial claim verifier. You are given a forward-looking numerical cl
 
 Determine if the claim was DELIVERED, MISSED, or if there is INSUFFICIENT_DATA to make a determination.
 
-Definitions:
-- DELIVERED: The actual reported value met or exceeded the claimed target (within 2% relative margin, accounting for unit equivalence)
-- MISSED: The actual reported value clearly fell short of or exceeded (for a cost target) the claimed threshold
+The filing was selected by its reporting-period end date, so the period is already correct.
+Companies label fiscal quarters differently from the calendar labels used here (e.g. a "Q2 FY2026"
+guide can be reported in a filing labelled Q2-2025 that ends in July 2025). Never answer
+INSUFFICIENT_DATA merely because the claim's fiscal label differs from the calendar label of the
+filing; compare the claim's period with the "reporting period ends" date instead.
+
+Each actual metric below is tagged [quarterly] or [annual]. A [quarterly] figure is that single
+three-month period only; an [annual] figure is the full fiscal year (roughly 4x a single quarter).
+Match the claim's own stated period (e.g. "Q4 revenue" → [quarterly]; "full year"/"FY" claims →
+[annual]) to the identically-tagged actual. Never compare a single-quarter claim against an
+[annual] total, or a full-year claim against a [quarterly] figure — treat that mismatch as
+INSUFFICIENT_DATA rather than guessing.
+
+First decide the metric's direction:
+- Growth-oriented (e.g. revenue, gross margin, EPS, growth rate): higher actual is better.
+- Cost-oriented (e.g. operating expenses, tax rate, cost of goods): lower actual is better.
+
+Definitions (apply relative to a 2% margin, accounting for unit equivalence):
+- DELIVERED: For a growth-oriented metric, the actual met or exceeded the claimed target. For a cost-oriented metric, the actual met or came in at/below the claimed target.
+- MISSED: For a growth-oriented metric, the actual fell short of the claimed target. For a cost-oriented metric, the actual exceeded the claimed target.
 - INSUFFICIENT_DATA: The filing does not contain a clearly matching metric, the metric definitions differ too much, or the data is ambiguous
+
+Beating a growth-oriented target (e.g. revenue coming in well above guidance) is always DELIVERED, never MISSED.
 
 Output ONLY a JSON object:
 {
@@ -70,8 +89,10 @@ def _build_verification_prompt(
     metrics: list,
 ) -> str:
     unit_str = f" {target_unit}" if target_unit else ""
+    period_end = next((m.period_end for m in metrics if m.period_end), None)
     metrics_lines = "\n".join(
-        f"  - {m.metric_name}: {m.value} {m.unit} (source: {m.section_reference}, status: {m.parse_status})"
+        f"  - {m.metric_name} [{m.period}]: {m.value} {m.unit} "
+        f"(source: {m.section_reference}, status: {m.parse_status})"
         for m in metrics
         if m.parse_status not in ("PARSE_FAILURE", "FETCH_ERROR")
     ) or "  (no metrics available)"
@@ -81,7 +102,8 @@ def _build_verification_prompt(
         f"  Claimed value: {target_value}{unit_str}\n"
         f"  Timeframe: {timeframe}\n"
         f"  Original quote: \"{raw_quote}\"\n\n"
-        f"Actual reported data from {actuals_quarter} ({filing_type}):\n"
+        f"Actual reported data from {actuals_quarter} ({filing_type}"
+        f"{', reporting period ends ' + period_end if period_end else ''}):\n"
         f"{metrics_lines}"
     )
 
@@ -131,6 +153,11 @@ def _parse_numeric_value(value_str: str, unit_str: str | None) -> tuple[float, s
         return (num * 1_000_000.0, "currency")
     if "trillion" in unit or unit in {"t", "tn", "tril"}:
         return (num * 1_000_000_000_000.0, "currency")
+    if unit == "ratio":
+        # Derived metrics (e.g. gross_margin) are stored as a 0–1 ratio, while a
+        # claim states the same figure as a percentage — scale up so a percent
+        # target and a ratio actual compare like-for-like (0.7499 → 74.99).
+        return (num * 100.0, "percent")
     if "%" in (unit_str or "") or "percent" in unit or has_percent_in_value:
         return (num, "percent")
     return (num, "raw")
@@ -167,6 +194,43 @@ def _compute_delta(
 
     delta = actual_num - target_num
     return str(delta), False
+
+
+_FULL_YEAR_RE = re.compile(r"full[- ]year|fiscal year|\bFY\s?\d{2,4}|annual", re.IGNORECASE)
+_PERIOD_TAG_RE = re.compile(r"\s*\[(quarterly|annual)\]\s*$", re.IGNORECASE)
+
+
+def _pick_actual_metric(
+    metrics: list,
+    llm_metric_name: str | None,
+    claim_metric: str,
+    claim_text: str,
+):
+    """The actual the delta is computed against.
+
+    A 10-K carries both a quarterly and an annual figure under the same metric name;
+    taking the first name match compared a one-quarter operating-income guide with the
+    full-year total. Prefer the period the claim is about (annual only when the claim
+    says full-year/FY, or the LLM tagged its match [annual]).
+    """
+    tag = _PERIOD_TAG_RE.search(llm_metric_name or "")
+    name = _PERIOD_TAG_RE.sub("", llm_metric_name or "").strip().lower()
+    if tag:
+        want = tag.group(1).lower()
+    else:
+        want = "annual" if _FULL_YEAR_RE.search(claim_text or "") else "quarterly"
+
+    def pool(match) -> list:
+        return [m for m in metrics if match(m)]
+
+    for needle in (name, claim_metric.strip().lower()):
+        if not needle:
+            continue
+        hits = pool(lambda m, n=needle: n in m.metric_name.lower())
+        if not hits:
+            continue
+        return next((m for m in hits if m.period == want), hits[0])
+    return None
 
 
 def _compute_confidence(
@@ -207,12 +271,13 @@ async def _insufficient_data(
     claim_id: str,
     reason: str,
     actuals_quarter: str,
-    confidence_score: Decimal = Decimal("0.20"),
+    confidence_score: Decimal | None = Decimal("0.20"),
     traces: list[dict] | None = None,
+    verdict_type: str = "INSUFFICIENT_DATA",
 ) -> VerificationResult:
     verdict_id = await insert_verdict(
         claim_id=claim_id,
-        verdict_type="INSUFFICIENT_DATA",
+        verdict_type=verdict_type,
         delta=None,
         confidence_score=confidence_score,
     )
@@ -228,12 +293,12 @@ async def _insufficient_data(
     return VerificationResult(
         claim_id=claim_id,
         verdict_id=verdict_id,
-        verdict_type="INSUFFICIENT_DATA",
+        verdict_type=verdict_type,
         actual_value=None,
         actuals_quarter=actuals_quarter,
         mapping_rationale=reason,
         delta=None,
-        confidence_score=float(confidence_score),
+        confidence_score=float(confidence_score) if confidence_score is not None else None,
     )
 
 
@@ -279,6 +344,18 @@ async def verify_claim(
         ),
     })
 
+    if decision.status == "PENDING":
+        # The filing that resolves this claim has not been published yet — the claim
+        # is genuinely open, not unverifiable. Re-verified on the next analysis run.
+        return await _insufficient_data(
+            claim_id=claim_id,
+            reason=f"Awaiting filing: {decision.mapping_rationale}",
+            actuals_quarter=decision.actuals_quarter or claim_quarter,
+            confidence_score=None,
+            traces=_traces,
+            verdict_type="PENDING",
+        )
+
     if decision.status == "FETCH_ERROR" or not decision.filing_url:
         logger.warning(
             "Temporal alignment failed — producing INSUFFICIENT_DATA",
@@ -322,7 +399,17 @@ async def verify_claim(
         ),
     })
 
-    if financials.status in ("FETCH_ERROR", "FILING_NOT_YET_AVAILABLE"):
+    if financials.status == "FILING_NOT_YET_AVAILABLE":
+        return await _insufficient_data(
+            claim_id=claim_id,
+            reason="Awaiting filing: not yet available on EDGAR",
+            actuals_quarter=actuals_quarter,
+            confidence_score=None,
+            traces=_traces,
+            verdict_type="PENDING",
+        )
+
+    if financials.status == "FETCH_ERROR":
         logger.warning(
             "Financial actuals unavailable — producing INSUFFICIENT_DATA",
             extra={
@@ -453,19 +540,9 @@ async def verify_claim(
     best_metric_status: str | None = None
 
     if financials.metrics:
-        # Prefer the metric the LLM named; fall back to name-based search
-        candidates = financials.metrics
-        matched_m = None
-        if matched_metric_name:
-            matched_m = next(
-                (m for m in candidates if matched_metric_name.lower() in m.metric_name.lower()),
-                None,
-            )
-        if matched_m is None:
-            matched_m = next(
-                (m for m in candidates if claim_metric.lower() in m.metric_name.lower()),
-                None,
-            )
+        matched_m = _pick_actual_metric(
+            financials.metrics, matched_metric_name, claim_metric, f"{timeframe} {raw_quote}"
+        )
         if matched_m is not None:
             actual_value = matched_m.value
             actual_unit = matched_m.unit

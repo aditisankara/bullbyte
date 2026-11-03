@@ -28,6 +28,9 @@ services:
       - /app/node_modules
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/bullbyte
+      REDIS_URL: redis://redis:6379
+      ML_SIDECAR_URL: http://ml-sidecar:8000
+      NESTJS_WEBHOOK_URL: http://api:3000/internal
     command: ["npm", "run", "start:dev"]
 
   ml-sidecar:
@@ -35,6 +38,7 @@ services:
       - ./ml-sidecar:/app
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/bullbyte
+      NESTJS_WEBHOOK_URL: http://api:3000/internal
     command: ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     ports:
       - "8000:8000"

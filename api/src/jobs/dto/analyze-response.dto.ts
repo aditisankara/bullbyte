@@ -6,9 +6,11 @@ import { jobStatusEnum } from '../../db/schema';
  */
 export type JobStatus = (typeof jobStatusEnum.enumValues)[number];
 
+/** `RUNNING` covers reconnecting to a job already in flight — prevents a
+ *  retriggered analyze from spawning a duplicate job for the same ticker. */
 export interface QueuedAnalyzeResponse {
 	jobId: string;
-	status: 'QUEUED';
+	status: 'QUEUED' | 'RUNNING';
 }
 
 export interface CachedAnalyzeResponse {

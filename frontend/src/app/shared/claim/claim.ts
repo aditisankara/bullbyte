@@ -22,6 +22,8 @@ export interface ClaimSummary {
   delta?: string;
   /** Verification confidence in the range 0–1. */
   confidence: number;
+  /** Why the claim is pending / unverifiable (shown under the quote). */
+  note?: string;
 }
 
 /**

@@ -33,6 +33,7 @@ _MOCK_METRICS = [
         filing_url="https://sec.gov/Archives/edgar/data/1318605/0001-24-001-index.htm",
         filing_type="10-Q",
         parse_status="SUCCESS",
+        period_end="2024-09-30",
     )
 ]
 
@@ -180,6 +181,19 @@ async def test_transcript_parse_failure_not_persisted():
 
 
 # ── Financials cache hit ──────────────────────────────────────────────────────
+
+async def test_financials_cache_row_without_period_end_is_refetched():
+    """Rows cached by the old (year-to-date) extraction carry no period_end and are stale."""
+    row = _cached_financials_row()
+    row["metrics"] = [{**m, "period_end": None} for m in row["metrics"]]
+    with patch("src.services.financials_service.get_cached_financial_actuals",
+               new_callable=AsyncMock, return_value=row),          patch("src.services.financials_service.resolve_cik",
+               new_callable=AsyncMock, return_value="0001318605"),          patch("src.services.financials_service._find_filing",
+               new_callable=AsyncMock, return_value=None):
+        result = await ingest_financial_actuals("TSLA", "Q3-2024")
+
+    assert result.status == "FILING_NOT_YET_AVAILABLE"
+
 
 async def test_financials_cache_hit_skips_edgar_fetch():
     """Financials cache hit must return cached result without any EDGAR HTTP calls."""
@@ -362,7 +376,7 @@ async def test_financials_filing_not_yet_available_not_persisted():
                new_callable=AsyncMock) as mock_insert, \
          patch("src.services.financials_service.resolve_cik",
                new_callable=AsyncMock, return_value="0001318605"), \
-         patch("src.services.financials_service._find_filing_accession",
+         patch("src.services.financials_service._find_filing",
                new_callable=AsyncMock, return_value=None):
         result = await ingest_financial_actuals("TSLA", "Q3-2024")
 

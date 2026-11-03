@@ -42,7 +42,9 @@ A forward-looking numerical claim is a statement about a FUTURE metric with a SP
 Examples: revenue targets, EPS guidance, margin forecasts, unit growth goals, capex plans.
 
 DO NOT include in claims:
-- Historical reported figures (e.g., "Q2 revenue was $117 billion")
+- Historical reported figures (e.g., "Q2 revenue was $117 billion"), including shareholder returns, buybacks and results of a period that has already ended
+- Declared dividends and routine corporate announcements (a dividend already declared is not a promise)
+- A second claim for the same sentence — when a sentence gives both GAAP and non-GAAP figures, emit ONE claim using the GAAP figure
 - Vague directional statements without numbers (e.g., "we expect growth")
 - Safe-harbour boilerplate disclaimers — put those in the "boilerplate" array instead
 
@@ -152,10 +154,11 @@ def _parse_llm_response(
                 )
             )
             continue
-        # Use provided quarter if LLM omitted it or returned a malformatted value
-        q = item.get("quarter", "")
-        if not q or not re.match(r"^Q[1-4]-\d{4}$", str(q)):
-            item = {**item, "quarter": quarter}
+        # Always label the claim with the transcript's own quarter. The LLM tends to
+        # answer with the company's *fiscal* quarter (NVIDIA's May-2026 call becomes
+        # "Q1-2027"), which then disagrees with every calendar-based lookup downstream
+        # and pushes the claim onto filings that do not exist yet.
+        item = {**item, "quarter": quarter}
         try:
             claims.append(ExtractedClaim(**item))
         except Exception as exc:
@@ -192,7 +195,25 @@ def _parse_llm_response(
                 extra={"entry": str(item)[:100], "error": str(exc), "ticker": ticker, "quarter": quarter, "jobId": job_id},
             )
 
-    return claims, errors, boilerplate
+    return _dedupe_claims(claims), errors, boilerplate
+
+
+def _dedupe_claims(claims: list[ExtractedClaim]) -> list[ExtractedClaim]:
+    """One claim per quoted sentence.
+
+    Guidance sentences like "GAAP and non-GAAP gross margins are expected to be 73.0%
+    and 73.5%" get emitted once per variant with the identical quote. Keep the first
+    (GAAP is listed first, and it is the only variant reported in XBRL filings).
+    """
+    seen: set[str] = set()
+    unique: list[ExtractedClaim] = []
+    for claim in claims:
+        key = " ".join(claim.raw_quote.lower().split())
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(claim)
+    return unique
 
 
 async def extract_claims(
