@@ -92,9 +92,15 @@ export class ClaimsService {
 			pageRows.map((c) => c.id)
 		);
 
+		const notes = await this.statusNotesFor(latestVerdicts);
+
 		return {
 			data: pageRows.map((c) =>
-				this.toListItem(c, latestVerdicts.get(c.id) ?? null)
+				this.toListItem(
+					c,
+					latestVerdicts.get(c.id) ?? null,
+					notes.get(latestVerdicts.get(c.id)?.id ?? '') ?? null
+				)
 			),
 			meta: { total, page: safePage, pageSize: CLAIMS_PAGE_SIZE },
 		};
@@ -213,9 +219,55 @@ export class ClaimsService {
 		return rows.find((v) => !superseded.has(v.id)) ?? null;
 	}
 
+	/**
+	 * Plain-language reason for every PENDING / INSUFFICIENT_DATA verdict, taken
+	 * from the last step of its reasoning trace — so the claim list can say
+	 * *why* a claim has no verdict instead of just "Insufficient data".
+	 */
+	private async statusNotesFor(
+		latest: Map<string, Verdict>
+	): Promise<Map<string, string>> {
+		const open = [...latest.values()].filter(
+			(v) =>
+				v.verdictType === 'PENDING' ||
+				v.verdictType === 'INSUFFICIENT_DATA'
+		);
+		const notes = new Map<string, string>();
+		if (open.length === 0) {
+			return notes;
+		}
+		const rows = await this.db
+			.select({
+				verdictId: reasoningTraces.verdictId,
+				resultSummary: reasoningTraces.resultSummary,
+			})
+			.from(reasoningTraces)
+			.where(
+				inArray(
+					reasoningTraces.verdictId,
+					open.map((v) => v.id)
+				)
+			)
+			.orderBy(desc(reasoningTraces.stepIndex));
+		const lastSummary = new Map<string, string | null>();
+		for (const r of rows) {
+			if (!lastSummary.has(r.verdictId)) {
+				lastSummary.set(r.verdictId, r.resultSummary);
+			}
+		}
+		for (const v of open) {
+			notes.set(
+				v.id,
+				statusNote(v.verdictType, lastSummary.get(v.id) ?? null)
+			);
+		}
+		return notes;
+	}
+
 	private toListItem(
 		claim: Claim,
-		verdict: Verdict | null
+		verdict: Verdict | null,
+		statusNote: string | null = null
 	): ClaimListItemDto {
 		return {
 			id: claim.id,
@@ -227,6 +279,7 @@ export class ClaimsService {
 			targetUnit: claim.targetUnit,
 			extractionConfidence: Number(claim.extractionConfidence),
 			verdict: this.toVerdictDto(verdict),
+			statusNote,
 		};
 	}
 
@@ -247,4 +300,25 @@ export class ClaimsService {
 			createdAt: verdict.createdAt.toISOString(),
 		};
 	}
+}
+
+const NOTE_MAX_CHARS = 180;
+
+/** "LLM verdict: INSUFFICIENT_DATA (matched: none). <reason>" -> "<reason>". */
+export function statusNote(
+	verdictType: string,
+	lastSummary: string | null
+): string {
+	if (verdictType === 'PENDING') {
+		return 'Waiting for the filing that reports this period.';
+	}
+	const summary = (lastSummary ?? '').trim();
+	const llm = /^LLM verdict:\s*\w+\s*\([^)]*\)\.?\s*(.*)$/s.exec(summary);
+	const reason = (llm ? llm[1] : summary).trim();
+	if (!reason) {
+		return 'Not enough matching filing data to verify this claim.';
+	}
+	return reason.length > NOTE_MAX_CHARS
+		? `${reason.slice(0, NOTE_MAX_CHARS - 1).trimEnd()}…`
+		: reason;
 }

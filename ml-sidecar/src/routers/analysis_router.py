@@ -14,11 +14,14 @@ from src.core.progress_webhook import emit_progress
 from src.db.queries import (
     get_all_transcripts_for_ticker,
     get_company_id_by_ticker,
+    get_existing_claim_keys,
+    get_pending_claims_for_ticker,
     insert_claim_batch,
+    set_company_name_if_placeholder,
 )
 from src.models.progress_models import ProgressEvent
 from src.services.extraction_service import extract_claims
-from src.services.ingestion_service import ingest_8k_transcripts
+from src.services.ingestion_service import ingest_8k_transcripts, resolve_company_name
 from src.services.verification_service import verify_claim
 
 # 8 quarters of earnings calls
@@ -53,6 +56,32 @@ async def _run_extraction(ticker: str, job_id: str) -> None:
         )
 
 
+async def _reverify_pending_claims(ticker: str, job_id: str) -> None:
+    """Give claims that were PENDING (filing not yet published) another verification pass.
+
+    Verdicts are append-only, so a claim whose filing has since landed simply gets a
+    newer DELIVERED / MISSED / INSUFFICIENT_DATA row; one still waiting gets a new
+    PENDING row, which is harmless.
+    """
+    pending = await get_pending_claims_for_ticker(ticker)
+    for row in pending:
+        await verify_claim(
+            claim_id=str(row["id"]),
+            claim_quarter=row["quarter"],
+            claim_metric=row["metric"],
+            target_value=row["target_value"],
+            target_unit=row["target_unit"],
+            ticker=ticker,
+            job_id=job_id,
+            raw_quote=row["raw_quote"],
+        )
+    if pending:
+        logger.info(
+            "Re-verified pending claims",
+            extra={"ticker": ticker, "jobId": job_id, "count": len(pending)},
+        )
+
+
 async def _do_extraction(ticker: str, job_id: str) -> None:
     company_id = await get_company_id_by_ticker(ticker)
     if company_id is None:
@@ -68,6 +97,10 @@ async def _do_extraction(ticker: str, job_id: str) -> None:
             )
         )
         return
+
+    company_name = await resolve_company_name(ticker)
+    if company_name:
+        await set_company_name_if_placeholder(ticker, company_name.title() if company_name.isupper() else company_name)
 
     # Ingest transcripts from EDGAR before extraction so a fresh DB is populated.
     # ingest_8k_transcripts is idempotent — cached (ticker, quarter) rows are skipped.
@@ -96,6 +129,8 @@ async def _do_extraction(ticker: str, job_id: str) -> None:
         },
     )
 
+    await _reverify_pending_claims(ticker, job_id)
+
     transcripts = await get_all_transcripts_for_ticker(ticker)
     if not transcripts:
         logger.info("No valid transcripts found", extra={"ticker": ticker, "jobId": job_id})
@@ -119,11 +154,14 @@ async def _do_extraction(ticker: str, job_id: str) -> None:
             jobId=job_id,
             stepIndex=0,
             totalSteps=total_steps,
-            message=f"Starting claim extraction for {ticker} ({len(transcripts)} transcripts)",
+            message=f"Reading {len(transcripts)} quarterly filings for {ticker}",
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
     )
 
+    existing_claims = await get_existing_claim_keys(company_id)
+
+    claims_found = 0
     step = 1
     for transcript in transcripts:
         quarter = transcript["quarter"]
@@ -156,6 +194,15 @@ async def _do_extraction(ticker: str, job_id: str) -> None:
                         "raw_segment": err.raw_segment[:200],
                     },
                 )
+
+        # Re-runs re-extract the same transcripts — skip claims already stored so
+        # they are not duplicated (verdicts for them are refreshed separately).
+        new_claims = [
+            c for c in result.claims
+            if (c.quarter, c.raw_quote, c.metric) not in existing_claims
+        ]
+        result.claims = new_claims
+        claims_found += len(new_claims)
 
         if result.claims:
             claim_dicts = [
@@ -218,7 +265,11 @@ async def _do_extraction(ticker: str, job_id: str) -> None:
             jobId=job_id,
             stepIndex=total_steps,
             totalSteps=total_steps,
-            message=f"Claim extraction complete for {ticker}",
+            message=(
+                f"Claim extraction complete for {ticker}"
+                if claims_found or existing_claims
+                else f"No forward-looking numerical guidance found in {ticker}'s filings"
+            ),
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
     )

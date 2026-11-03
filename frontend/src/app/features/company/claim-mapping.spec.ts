@@ -5,6 +5,7 @@ import {
 } from '../../core/api/claim.models';
 import {
   buildTimeline,
+  formatDelta,
   normaliseQuarterKey,
   toClaimDetail,
   toClaimSummaries,
@@ -76,9 +77,16 @@ describe('claim-mapping', () => {
       expect(summary.confidence).toBe(0.65);
     });
 
-    it('falls back to a placeholder when speaker is null', () => {
+    it('attributes a speakerless claim to the company, not "Unknown speaker"', () => {
       const [summary] = toClaimSummaries([claim({ speaker: null })]);
-      expect(summary.speaker).toBe('Unknown speaker');
+      expect(summary.speaker).toBe('Company guidance');
+    });
+
+    it('formats raw float deltas compactly', () => {
+      expect(formatDelta('0.6200000000000045')).toBe('+0.62');
+      expect(formatDelta('-287000000.0')).toBe('−$287M');
+      expect(formatDelta('1743000000.0')).toBe('+$1.74B');
+      expect(formatDelta(null)).toBeUndefined();
     });
 
     it('omits delta when the verdict carries none', () => {

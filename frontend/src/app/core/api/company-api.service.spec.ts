@@ -63,7 +63,7 @@ describe('CompanyApiService', () => {
     let response: ClaimListResponse | undefined;
     service.getClaims('TSLA').subscribe((r) => (response = r));
 
-    const req = http.expectOne(`${environment.apiBaseUrl}/companies/TSLA/claims`);
+    const req = http.expectOne(`${environment.apiBaseUrl}/companies/TSLA/claims?page=1`);
     expect(req.request.method).toBe('GET');
     req.flush(payload);
 

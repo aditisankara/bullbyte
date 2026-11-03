@@ -10,6 +10,7 @@ import {
 	UseGuards,
 } from '@nestjs/common';
 import type { LoggerService } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { InternalWebhookGuard } from '../common/guards/internal-webhook.guard';
 import { ProgressService } from './progress.service';
@@ -23,7 +24,12 @@ import { ProgressWebhookDto } from './dto/progress-webhook.dto';
  * Mounted at `/internal/jobs/:jobId/progress` — the `internal` prefix is excluded
  * from the global `api/v1` prefix in main.ts, matching NESTJS_WEBHOOK_URL.
  * Guarded by a shared-secret header (NFR13/NFR14).
+ *
+ * Exempt from the per-IP rate limit: FastAPI emits dozens of events per run from
+ * a single IP, and a throttled (429) analysis-complete event leaves the job
+ * stuck in RUNNING forever.
  */
+@SkipThrottle()
 @Controller('internal/jobs')
 @UseGuards(InternalWebhookGuard)
 export class InternalWebhookController {

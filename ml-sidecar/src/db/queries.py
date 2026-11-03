@@ -193,6 +193,16 @@ async def get_company_id_by_ticker(ticker: str) -> str | None:
     return str(row["id"]) if row else None
 
 
+async def set_company_name_if_placeholder(ticker: str, name: str) -> None:
+    """Replace the ticker-as-name placeholder written at company creation."""
+    pool = await get_pool()
+    await pool.execute(
+        "UPDATE companies SET name = $2 WHERE ticker = $1 AND name = ticker",
+        ticker,
+        name,
+    )
+
+
 async def get_all_transcripts_for_ticker(ticker: str) -> list[asyncpg.Record]:
     """Return all transcripts for a ticker with parse_status SUCCESS or PRESS_RELEASE."""
     pool = await get_pool()
@@ -279,7 +289,7 @@ async def insert_financial_actuals(
     filing_url: str,
     metrics_json: str,
 ) -> None:
-    """Persist financial actuals to the cache. ON CONFLICT (ticker, quarter) DO NOTHING.
+    """Persist financial actuals to the cache. ON CONFLICT (ticker, quarter) DO UPDATE (refreshes stale rows).
 
     metrics_json must be a pre-serialised JSON string:
         json.dumps([m.model_dump() for m in result.metrics])
@@ -292,7 +302,12 @@ async def insert_financial_actuals(
         INSERT INTO financial_actuals
             (id, ticker, quarter, filing_type, status, filing_url, metrics)
         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
-        ON CONFLICT (ticker, quarter) DO NOTHING
+        ON CONFLICT (ticker, quarter) DO UPDATE SET
+            filing_type = EXCLUDED.filing_type,
+            status = EXCLUDED.status,
+            filing_url = EXCLUDED.filing_url,
+            metrics = EXCLUDED.metrics,
+            ingested_at = now()
         """,
         row_id,
         ticker,
@@ -383,12 +398,50 @@ async def get_verdicts_for_ticker(ticker: str) -> list[asyncpg.Record]:
     pool = await get_pool()
     return await pool.fetch(
         """
-        SELECT v.verdict_type, COUNT(*)::int AS count
-        FROM verdicts v
-        JOIN claims c ON c.id = v.claim_id
-        JOIN companies co ON co.id = c.company_id
-        WHERE co.ticker = $1
-        GROUP BY v.verdict_type
+        SELECT verdict_type, COUNT(*)::int AS count
+        FROM (
+            -- Verdicts are append-only: a re-verified claim has several rows, and
+            -- only the newest one is its effective verdict.
+            SELECT DISTINCT ON (v.claim_id) v.verdict_type
+            FROM verdicts v
+            JOIN claims c ON c.id = v.claim_id
+            JOIN companies co ON co.id = c.company_id
+            WHERE co.ticker = $1
+            ORDER BY v.claim_id, v.created_at DESC
+        ) latest
+        GROUP BY verdict_type
         """,
         ticker,
     )
+
+
+async def get_pending_claims_for_ticker(ticker: str) -> list[asyncpg.Record]:
+    """Claims whose effective (newest) verdict is PENDING — candidates for re-verification."""
+    pool = await get_pool()
+    return await pool.fetch(
+        """
+        SELECT c.id, c.quarter, c.metric, c.raw_quote, c.target_value, c.target_unit
+        FROM claims c
+        JOIN companies co ON co.id = c.company_id
+        JOIN LATERAL (
+            SELECT v.verdict_type
+            FROM verdicts v
+            WHERE v.claim_id = c.id
+            ORDER BY v.created_at DESC
+            LIMIT 1
+        ) latest ON TRUE
+        WHERE co.ticker = $1 AND latest.verdict_type = 'PENDING'
+        ORDER BY c.quarter
+        """,
+        ticker,
+    )
+
+
+async def get_existing_claim_keys(company_id: str) -> set[tuple[str, str, str]]:
+    """(quarter, raw_quote, metric) of every stored claim — used to skip duplicates on re-runs."""
+    pool = await get_pool()
+    rows = await pool.fetch(
+        "SELECT quarter, raw_quote, metric FROM claims WHERE company_id = $1",
+        company_id,
+    )
+    return {(r["quarter"], r["raw_quote"], r["metric"]) for r in rows}

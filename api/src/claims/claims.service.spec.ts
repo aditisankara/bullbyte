@@ -94,6 +94,7 @@ describe('ClaimsService', () => {
 						targetValue: '120',
 						targetUnit: 'billion USD',
 						extractionConfidence: 0.85,
+						statusNote: null,
 						verdict: {
 							id: 'verdict-1',
 							verdictType: 'DELIVERED',

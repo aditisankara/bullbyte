@@ -136,7 +136,11 @@ import {
                 }
                 @case ('success') {
                   @if (visibleClaims().length === 0) {
-                    <p class="claims__status">No claims yet.</p>
+                    <p class="claims__status">
+                      No quantifiable forward-looking guidance was found in
+                      {{ normalisedTicker() }}'s public SEC filings, so there is
+                      nothing to verify yet.
+                    </p>
                   } @else {
                     <ul class="claims__list">
                       @for (c of visibleClaims(); track c.id) {
@@ -329,7 +333,7 @@ export class CompanyComponent {
     });
   }
 
-  protected load(): void {
+  protected load(autoAnalyse = true): void {
     this.state.set('loading');
     this.api.getSummary(this.normalisedTicker()).subscribe({
       next: (summary) => {
@@ -341,8 +345,30 @@ export class CompanyComponent {
         }
       },
       error: (err: ApiError) => {
+        // A direct / shared URL for a ticker we have never analysed: start the
+        // analysis instead of claiming EDGAR has no filings. The analyze endpoint
+        // validates the symbol, so a genuinely bad ticker still lands on the
+        // not-found state below.
+        if (err.status === 404 && autoAnalyse) {
+          this.startAnalysisFor404();
+          return;
+        }
         this.errorKind.set(
           err.status === 404 ? 'ticker-not-found' : 'edgar-unavailable',
+        );
+        this.state.set('error');
+      },
+    });
+  }
+
+  private startAnalysisFor404(): void {
+    this.api.analyze(this.normalisedTicker()).subscribe({
+      next: () => this.load(false),
+      error: (err: ApiError) => {
+        this.errorKind.set(
+          err.status === 400 || err.status === 404
+            ? 'ticker-not-found'
+            : 'edgar-unavailable',
         );
         this.state.set('error');
       },

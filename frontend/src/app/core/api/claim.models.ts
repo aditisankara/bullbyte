@@ -36,6 +36,8 @@ export interface ClaimListItem {
   targetUnit: string | null;
   extractionConfidence: number; // numeric(4,3) parsed to number
   verdict: ClaimVerdictApi | null; // null while the claim is pending
+  /** Plain-language reason a claim is pending / unverifiable; null otherwise. */
+  statusNote?: string | null;
 }
 
 export interface ClaimListMeta {

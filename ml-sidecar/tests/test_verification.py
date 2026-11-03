@@ -186,7 +186,7 @@ async def test_insufficient_data_on_alignment_fetch_error():
 
 
 @pytest.mark.asyncio
-async def test_insufficient_data_on_filing_not_yet_available():
+async def test_pending_on_filing_not_yet_available():
     from src.services.verification_service import verify_claim
 
     mock_prov = MagicMock()
@@ -205,7 +205,7 @@ async def test_insufficient_data_on_filing_not_yet_available():
     ):
         result = await verify_claim(**CLAIM_KWARGS)
 
-    assert result.verdict_type == "INSUFFICIENT_DATA"
+    assert result.verdict_type == "PENDING"
     mock_prov.complete.assert_not_called()
 
 

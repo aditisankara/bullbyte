@@ -72,7 +72,9 @@ describe('JobsService', () => {
 	it('returns COMPLETED/cached and enqueues nothing for a cached ticker (AC3)', async () => {
 		db.selectLimit
 			.mockResolvedValueOnce([{ id: 'company-1' }]) // ensureCompany: exists
-			.mockResolvedValueOnce([{ status: 'COMPLETED' }]); // isCached: latest done
+			.mockResolvedValueOnce([
+				{ id: 'job-0', status: 'COMPLETED', createdAt: new Date() },
+			]); // isCached: latest done
 
 		const result = await service.requestAnalysis('TSLA');
 
@@ -82,6 +84,50 @@ describe('JobsService', () => {
 			cached: true,
 		});
 		expect(queue.add).not.toHaveBeenCalled();
+	});
+
+	it('returns the in-flight job and enqueues nothing when one is already RUNNING (dedup)', async () => {
+		db.selectLimit
+			.mockResolvedValueOnce([{ id: 'company-1' }]) // ensureCompany: exists
+			.mockResolvedValueOnce([
+				{ id: 'job-1', status: 'RUNNING', createdAt: new Date() },
+			]); // latestJob: in flight
+
+		const result = await service.requestAnalysis('TSLA');
+
+		expect(result).toEqual({ jobId: 'job-1', status: 'RUNNING' });
+		expect(queue.add).not.toHaveBeenCalled();
+	});
+
+	it('returns the in-flight job and enqueues nothing when one is already QUEUED (dedup)', async () => {
+		db.selectLimit
+			.mockResolvedValueOnce([{ id: 'company-1' }]) // ensureCompany: exists
+			.mockResolvedValueOnce([
+				{ id: 'job-1', status: 'QUEUED', createdAt: new Date() },
+			]); // latestJob: in flight
+
+		const result = await service.requestAnalysis('TSLA');
+
+		expect(result).toEqual({ jobId: 'job-1', status: 'QUEUED' });
+		expect(queue.add).not.toHaveBeenCalled();
+	});
+
+	it('fails an orphaned RUNNING job and starts a fresh one', async () => {
+		db.selectLimit
+			.mockResolvedValueOnce([{ id: 'company-1' }]) // ensureCompany: exists
+			.mockResolvedValueOnce([
+				{
+					id: 'job-old',
+					status: 'RUNNING',
+					createdAt: new Date(Date.now() - 60 * 60 * 1000),
+				},
+			]); // latestJob: stale
+		db.insertReturning.mockResolvedValueOnce([{ id: 'job-new' }]);
+
+		const result = await service.requestAnalysis('TSLA');
+
+		expect(result).toEqual({ jobId: 'job-new', status: 'QUEUED' });
+		expect(queue.add).toHaveBeenCalledTimes(1);
 	});
 
 	it('creates the company when missing, then enqueues', async () => {

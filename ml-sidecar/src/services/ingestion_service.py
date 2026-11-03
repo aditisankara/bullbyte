@@ -22,6 +22,7 @@ logger = get_logger("ml-sidecar.ingestion_service")
 
 # Populated once on first call to ingest_8k_transcripts(); never re-fetched per request.
 _TICKER_CIK_MAP: dict[str, str] = {}
+_TICKER_NAME_MAP: dict[str, str] = {}
 # asyncio.Lock guards against concurrent coroutines racing to populate _TICKER_CIK_MAP.
 _cik_map_lock = asyncio.Lock()
 
@@ -53,7 +54,7 @@ _TRANSCRIPT_KEYWORDS = [
 
 async def _load_ticker_cik_map() -> None:
     """Fetch company_tickers.json and populate _TICKER_CIK_MAP (idempotent, concurrency-safe)."""
-    global _TICKER_CIK_MAP
+    global _TICKER_CIK_MAP, _TICKER_NAME_MAP
     async with _cik_map_lock:
         if _TICKER_CIK_MAP:
             return
@@ -62,6 +63,10 @@ async def _load_ticker_cik_map() -> None:
         data = response.json()
         _TICKER_CIK_MAP = {
             entry["ticker"].upper(): f"{entry['cik_str']:010d}"
+            for entry in data.values()
+        }
+        _TICKER_NAME_MAP = {
+            entry["ticker"].upper(): str(entry.get("title", "")).strip()
             for entry in data.values()
         }
 
@@ -73,6 +78,15 @@ async def resolve_cik(ticker: str) -> str:
     if cik is None:
         raise ValueError(f"Ticker {ticker!r} not found in EDGAR company index")
     return cik
+
+
+async def resolve_company_name(ticker: str) -> str | None:
+    """EDGAR's registered name for ``ticker`` (e.g. "NVIDIA CORP"), or None if unknown."""
+    try:
+        await _load_ticker_cik_map()
+    except Exception:  # name is cosmetic — never fail an analysis over it
+        return None
+    return _TICKER_NAME_MAP.get(ticker.upper()) or None
 
 
 # ── Task 4: 8-K filing discovery ─────────────────────────────────────────────
